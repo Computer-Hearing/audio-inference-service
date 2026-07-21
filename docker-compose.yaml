@@ -3,7 +3,7 @@ version: '3.8'
 services:
   triton:
     container_name: triton
-    image: nvcr.io/nvidia/tritonserver:24.09-py3
+    build: .
     ports:
       - 8000:8000 # HTTP endpoints for inference
       - 8001:8001 # GRPS endpoints for inference
@@ -16,5 +16,5 @@ services:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]
+            - capabilities: [ gpu ]
               count: 1

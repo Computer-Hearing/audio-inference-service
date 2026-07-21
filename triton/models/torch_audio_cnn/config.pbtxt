@@ -1,25 +1,27 @@
 name: "torch_audio_cnn"
-platform: "onnxruntime_onnx"
+backend: "onnxruntime"
 max_batch_size: 1
 
-input = [
+default_model_filename: "cnn_model.onnx"
+
+input [
     {
-        name:"input"
+        name: "input"
         data_type: TYPE_FP32
         format: FORMAT_NCHW
-        dims: [ 1, 1, 256, 173 ]
+        dims: [ 1, 256, 173 ]
     }
 ]
 
-output = [
+output [
     {
         name: "category_output"
         data_type: TYPE_FP32
-        dims: [ 1, 5 ]
+        dims: [ 5 ]
     },
     {
         name: "target_output"
         data_type: TYPE_FP32
-        dims: [ 1, 7 ]
+        dims: [ 7 ]
     }
 ]
