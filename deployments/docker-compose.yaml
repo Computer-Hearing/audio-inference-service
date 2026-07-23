@@ -3,7 +3,9 @@ version: '3.8'
 services:
   triton:
     container_name: triton
-    build: .
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.triton
     ports:
       - 8000:8000 # HTTP endpoints for inference
       - 8001:8001 # GRPS endpoints for inference
