@@ -1,7 +1,7 @@
 package chunks
 
 import (
-	"audio-inference-service/pkg/constants"
+	"audio-inference-service/pkg"
 	"bytes"
 	"fmt"
 	"io"
@@ -19,13 +19,13 @@ type AudioChunks struct {
 }
 
 func ChunksFromRequest(r *http.Request) (*AudioChunks, error) {
-	file, header, err := r.FormFile(constants.FormDataAudioKey)
+	file, header, err := r.FormFile(pkg.FormDataAudioKey)
 	if err != nil {
-		return nil, fmt.Errorf("получение файла из формы: %w", err)
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusBadRequest}
 	}
 	defer file.Close()
 
-	return splitAudio(file, header, constants.SecondsPerAudioChunk) // 2 секунды на кусок
+	return splitAudio(file, header, pkg.SecondsPerAudioChunk) // 2 секунды на кусок
 }
 
 // Берем мультипарт-файл дробим его и выдаем массивчик чанков звука
@@ -33,26 +33,26 @@ func splitAudio(file multipart.File, header *multipart.FileHeader, chunkSeconds 
 	// Создаем временную папку с суффиксом, для уникальности
 	tmpDir, err := os.MkdirTemp("", "audio_split")
 	if err != nil {
-		return nil, fmt.Errorf("создание temp директории: %w", err)
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
 	}
 	defer os.RemoveAll(tmpDir)
 
 	// Расширение файла, если есть
 	ext := filepath.Ext(header.Filename)
 	if ext == "" {
-		ext = ".mp3" // на случай, если расширения нет
+		ext = ".wav" // на случай, если расширения нет
 	}
 
 	// Создаем временный файл (ffmpeg - утилита, берет файла по пути, то есть файл сохраненный)
 	inputPath := filepath.Join(tmpDir, "input"+ext)
 	dst, err := os.Create(inputPath)
 	if err != nil {
-		return nil, fmt.Errorf("создание временного файла: %w", err)
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
 	}
 	// Копируем его туда данные мультпарт
 	if _, err := io.Copy(dst, file); err != nil {
 		dst.Close()
-		return nil, fmt.Errorf("копирование файла: %w", err)
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
 	}
 	dst.Close()
 
@@ -74,13 +74,13 @@ func splitAudio(file multipart.File, header *multipart.FileHeader, chunkSeconds 
 	cmd.Stderr = &stderr
 	// выполняем
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("ffmpeg завершился с ошибкой: %w, stderr: %s", err, stderr.String())
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
 	}
 
 	// Получаем список названий файлов-чанков из временной этой папки
 	matches, err := filepath.Glob(filepath.Join(tmpDir, "chunk_*"+ext))
 	if err != nil {
-		return nil, fmt.Errorf("поиск получившихся файлов: %w", err)
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
 	}
 	sort.Strings(matches) // chunk_000, chunk_001, ... — сортируем на всякий случай
 
@@ -101,4 +101,24 @@ func splitAudio(file multipart.File, header *multipart.FileHeader, chunkSeconds 
 		Filename: header.Filename,
 		Chunks:   chunks,
 	}, nil
+}
+
+// InferenceResult результат по одному чанку
+type InferenceResult struct {
+	CategoryLogits []float32 // 5 значений
+	TargetLogits   []float32 // 7 значений
+}
+
+// ChunkResult результат инференса одного чанка с привязкой к его индексу
+type ChunkResult struct {
+	ChunkIndex int
+	Category   []float32
+	Target     []float32
+	Err        error
+}
+
+// FileInferenceResult агрегированный результат по всему файлу
+type FileInferenceResult struct {
+	Filename string
+	Chunks   []ChunkResult // в исходном порядке чанков
 }

@@ -1,18 +1,20 @@
 package service
 
 import (
+	"audio-inference-service/pkg"
 	"audio-inference-service/pkg/chunks"
-
-	"github.com/google/uuid"
+	"context"
+	"github.com/jackc/pgx/v4"
 )
 
 type FilePredictor interface {
-	Predict(taskID uuid.UUID, chunks *chunks.AudioChunks) ([]string, []string, error)
+	ProcessTask(ctx context.Context) error
 }
 
 type TaskLoader interface {
-	Load(taskID uuid.UUID, chunks *chunks.AudioChunks) ([]string, []string, error)
-	LoadAll(taskID uuid.UUID, chunks *chunks.AudioChunks) ([]string, []string, error)
-	Delete(taskID uuid.UUID, chunks *chunks.AudioChunks) error
-	DeleteAll(taskID uuid.UUID, chunks *chunks.AudioChunks) error
+	CreateTask(
+		ctx context.Context, username pkg.Username, taskID pkg.Task, chunks *chunks.AudioChunks, waves []float64) error
+	GetStatus(ctx context.Context, taskID string, chunks *chunks.AudioChunks) (pkg.TaskStatus, error)
+	GetOneWithBlock(ctx context.Context) (pgx.Tx, pkg.Task, chunks.AudioChunks, error)
+	GetHistory(ctx context.Context, taskID string, chunks *chunks.AudioChunks) ([]chunks.FileInferenceResult, error)
 }

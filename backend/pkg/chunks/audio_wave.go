@@ -1,10 +1,9 @@
 package chunks
 
 import (
-	"audio-inference-service/pkg/constants"
+	"audio-inference-service/pkg"
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"math"
 	"mime/multipart"
@@ -13,13 +12,13 @@ import (
 )
 
 func AudioWaveFromRequest(r *http.Request) ([]float64, error) {
-	file, _, err := r.FormFile(constants.FormDataAudioKey)
+	file, _, err := r.FormFile(pkg.FormDataAudioKey)
 	if err != nil {
-		return nil, fmt.Errorf("получение файла из формы: %w", err)
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusBadRequest}
 	}
 	defer file.Close()
 
-	return audioWaveform(file, constants.AudioWaveBucketsLen)
+	return audioWaveform(file, pkg.AudioWaveBucketsLen)
 }
 
 // AudioWaveform декодирует аудиофайл из multipart.File и возвращает массив
@@ -37,7 +36,7 @@ func audioWaveform(file multipart.File, barCount int) ([]float64, error) {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, fmt.Errorf("stdin pipe: %w", err)
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -45,7 +44,7 @@ func audioWaveform(file multipart.File, barCount int) ([]float64, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("запуск ffmpeg: %w", err)
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
 	}
 
 	go func() {
@@ -54,12 +53,14 @@ func audioWaveform(file multipart.File, barCount int) ([]float64, error) {
 	}()
 
 	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("ffmpeg завершился с ошибкой: %w, stderr: %s", err, stderr.String())
+		details := make(map[string]string)
+		details["stderr"] = stderr.String()
+		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError, Details: details}
 	}
 
 	raw := stdout.Bytes()
 	if len(raw) < 2 {
-		return nil, fmt.Errorf("пустой аудиопоток после декодирования")
+		return nil, &pkg.APIError{Message: "ffmpeg stdout empty", StatusCode: http.StatusBadRequest}
 	}
 
 	samples := make([]int16, len(raw)/2)
