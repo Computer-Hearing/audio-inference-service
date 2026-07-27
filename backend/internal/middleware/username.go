@@ -27,3 +27,8 @@ func CheckUsernameCookie(logger *slog.Logger) func(next http.Handler) http.Handl
 		})
 	}
 }
+
+func GetUsernameFromContext(ctx context.Context) (pkg.Username, bool) {
+	username, ok := ctx.Value(UserContextKey).(string)
+	return pkg.Username(username), ok
+}
