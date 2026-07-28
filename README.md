@@ -49,7 +49,7 @@ Multi-task классификация звуков дорожного трафи
 | Transformer v1 | TensorFlow | YAMNet | 4 × 1024 | 17.10M | 8.68 | 95.3% | 79.6% | 77.0% |
 | Transformer v2 | TensorFlow | YAMNet | 4 × 1024 | 544K | 12.61 | 97.8% | 89.8% | 89.0% |
 | RNN | TensorFlow | YAMNet | 4 × 1024 | — | — | — | — | — |
-| MLP | TensorFlow | None | 4 × 1024 | — | — | — | — | — |
+| MLP | TensorFlow | None | мел-спектрограмма (вытянутая) | — | — | — | — | — |
 
 ---
 
