@@ -42,14 +42,14 @@ Multi-task классификация звуков дорожного трафи
 
 | Модель | Бэкенд | Эмбеддер | Вход | Параметры | Время (мс) | Vehicle Acc | Action Acc | Combined Acc |
 |--------|--------|----------|------|-----------|------------|-------------|------------|--------------|
-| CNN | PyTorch | — | мел-спектрограмма (2D) | — | — | 96.0% | 88.0% | — |
+| CNN | PyTorch | None | мел-спектрограмма (2D) | — | — | 96.0% | 88.0% | — |
 | Transformer (PyTorch) | PyTorch | PANNs | эмбеддинги 2048 | — | — | 97.0% | 89.0% | — |
 | LSTM v1 | TensorFlow | YAMNet | 4 × 1024 | 1.58M | 8.30 | 97.8% | 84.8% | 84.0% |
 | LSTM v2 | TensorFlow | YAMNet | 4 × 1024 | 645K | 9.44 | 97.8% | 87.0% | 86.0% |
 | Transformer v1 | TensorFlow | YAMNet | 4 × 1024 | 17.10M | 8.68 | 95.3% | 79.6% | 77.0% |
 | Transformer v2 | TensorFlow | YAMNet | 4 × 1024 | 544K | 12.61 | 97.8% | 89.8% | 89.0% |
 | RNN | TensorFlow | YAMNet | 4 × 1024 | — | — | — | — | — |
-| MLP | TensorFlow | YAMNet | 4 × 1024 | — | — | — | — | — |
+| MLP | TensorFlow | None | 4 × 1024 | — | — | — | — | — |
 
 ---
 
