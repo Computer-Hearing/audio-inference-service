@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+const (
+	AuthorErrorSqlite   string = "sqlite"
+	AuthorErrorTriton   string = "triton"
+	AuthorErrorPipeline string = "pipeline"
+)
+
 type APIError struct {
 	StatusCode int               `json:"status_code"`
 	Message    string            `json:"message"`

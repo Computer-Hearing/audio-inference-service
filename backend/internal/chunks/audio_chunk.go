@@ -14,8 +14,8 @@ import (
 )
 
 type AudioChunks struct {
-	Filename string   // исходное имя файла
-	Chunks   [][]byte // куски по 2 секунды
+	Filename string   `json:"filename"` // исходное имя файла
+	Chunks   [][]byte `json:"chunks"`   // куски по 2 секунды
 }
 
 func ChunksFromRequest(r *http.Request) (*AudioChunks, error) {
@@ -105,20 +105,20 @@ func splitAudio(file multipart.File, header *multipart.FileHeader, chunkSeconds 
 
 // InferenceResult результат по одному чанку
 type InferenceResult struct {
-	CategoryLogits []float32 // 5 значений
-	TargetLogits   []float32 // 7 значений
+	CategoryLogits []float32 `json:"category_logits"` // 5 значений
+	TargetLogits   []float32 `json:"target_logits"`   // 7 значений
 }
 
 // ChunkResult результат инференса одного чанка с привязкой к его индексу
 type ChunkResult struct {
-	ChunkIndex int
-	Category   []float32
-	Target     []float32
-	Err        error
+	ChunkIndex int       `json:"chunk_index"`
+	Category   []float32 `json:"category"`
+	Target     []float32 `json:"target"`
+	Err        error     `json:"error"`
 }
 
 // FileInferenceResult агрегированный результат по всему файлу
 type FileInferenceResult struct {
-	Filename string
-	Chunks   []ChunkResult // в исходном порядке чанков
+	Filename string        `json:"filename"`
+	Chunks   []ChunkResult `json:"chunks"` // в исходном порядке чанков
 }

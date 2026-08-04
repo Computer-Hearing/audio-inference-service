@@ -2,7 +2,6 @@ package main
 
 import (
 	"audio-inference-service/pkg"
-	"fmt"
 	"log/slog"
 	"os"
 )
@@ -14,5 +13,5 @@ func init() {
 }
 
 func main() {
-	fmt.Println("Дима тупой млщик")
+
 }

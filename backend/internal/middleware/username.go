@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"audio-inference-service/internal/domain"
 	"audio-inference-service/pkg"
 	"context"
 	"log/slog"
@@ -28,7 +29,7 @@ func CheckUsernameCookie(logger *slog.Logger) func(next http.Handler) http.Handl
 	}
 }
 
-func GetUsernameFromContext(ctx context.Context) (pkg.Username, bool) {
+func GetUsernameFromContext(ctx context.Context) (domain.Username, bool) {
 	username, ok := ctx.Value(UserContextKey).(string)
-	return pkg.Username(username), ok
+	return domain.Username(username), ok
 }

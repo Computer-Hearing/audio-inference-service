@@ -1,6 +1,7 @@
-package pkg
+package domain
 
 import (
+	"audio-inference-service/pkg"
 	"net/http"
 )
 
@@ -17,7 +18,7 @@ func (u Username) String() string {
 
 func (u Username) IsValid() error {
 	if len(u) < MinUsernameLength || len(u) > MaxUsernameLength {
-		return &APIError{Message: "Username length must be in 4-128", StatusCode: http.StatusBadRequest}
+		return &pkg.APIError{Message: "Username length must be in 4-128", StatusCode: http.StatusBadRequest}
 	}
 	return nil
 }

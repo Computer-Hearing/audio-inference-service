@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Config настройки retry
-type Config struct {
+// RetryConfig настройки retry
+type RetryConfig struct {
 	MaxRetries    int           // максимум попыток (не считая первую)
 	InitialDelay  time.Duration // задержка перед первым повтором
 	MaxDelay      time.Duration // потолок задержки
@@ -22,8 +22,8 @@ type Config struct {
 }
 
 // DefaultConfig разумные значения по умолчанию
-func DefaultConfig() Config {
-	return Config{
+func DefaultConfig() RetryConfig {
+	return RetryConfig{
 		MaxRetries:    5,
 		InitialDelay:  500 * time.Millisecond,
 		MaxDelay:      30 * time.Second,
@@ -43,7 +43,7 @@ type IsRetryableFunc func(err error) bool
 // RetryDo выполняет fn с экспоненциальным backoff.
 // Останавливается при успехе, при исчерпании попыток, при отмене контекста
 // или если IsRetryableFunc вернула false для конкретной ошибки.
-func RetryDo(ctx context.Context, cfg *Config, fn RetryableFunc, isRetryable IsRetryableFunc) error {
+func RetryDo(ctx context.Context, cfg *RetryConfig, fn RetryableFunc, isRetryable IsRetryableFunc) error {
 	if cfg == nil {
 		*cfg = DefaultConfig()
 	}

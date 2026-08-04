@@ -1,6 +1,7 @@
-package pkg
+package domain
 
 import (
+	"audio-inference-service/internal/chunks"
 	"crypto/md5"
 	"fmt"
 
@@ -18,7 +19,12 @@ func GenerateTaskID(userName string) Task {
 	return Task(fmt.Sprintf("%x", md5.Sum([]byte(userName+uuid.NewString()))))
 }
 
+type TaskPayload struct {
+	TaskID Task
+	Chunks chunks.AudioChunks
+}
+
 type TaskResponse struct {
-	TaskID Task      `json:"task_id"`
-	Waves  []float64 `json:"waves"`
+	TaskID Task
+	Waves  []float64
 }
