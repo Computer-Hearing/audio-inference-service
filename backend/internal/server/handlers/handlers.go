@@ -3,6 +3,7 @@ package handlers
 import (
 	"audio-inference-service/internal/chunks"
 	"audio-inference-service/internal/domain"
+	"audio-inference-service/internal/middleware"
 	"audio-inference-service/internal/modules"
 	"audio-inference-service/pkg"
 
@@ -17,21 +18,23 @@ type Handlers struct {
 	logger     *slog.Logger
 }
 
+func New(taskLoader modules.TaskManager, logger *slog.Logger) *Handlers {
+	return &Handlers{taskLoader: taskLoader, logger: logger}
+}
+
 func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
-	userName, err := r.Cookie(pkg.UsernameCookieKey)
-	if err != nil {
-		pkg.SendError(h.logger, w, fmt.Errorf("username cookie is empty"), http.StatusUnauthorized)
+	username, ok := middleware.GetUsernameFromContext(r.Context())
+	if !ok {
+		pkg.SendError(h.logger, w, fmt.Errorf("username cookie/header are empty"), http.StatusUnauthorized)
 		return
 	}
 
-	// Проверяем есть ли имя пользователя
-	userDomain := domain.Username(userName.Value)
-	if err := userDomain.IsValid(); err != nil {
+	if err := username.IsValid(); err != nil {
 		h.handleError(w, err)
 		return
 	}
 	// генерируем таску
-	taskID := domain.GenerateTaskID(userName.Value)
+	taskID := domain.GenerateTaskID(username.String())
 	// получаем чанки - раздробленный звуковой файл на несколько по две секунды, переведенные в байты
 	ch, err := chunks.ChunksFromRequest(r)
 	if err != nil {
@@ -46,13 +49,63 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создаем таску
-	if err := h.taskLoader.CreateTask(r.Context(), userDomain, taskID, *ch, waves); err != nil {
+	if err := h.taskLoader.CreateTask(r.Context(), username, taskID, *ch, waves); err != nil {
 		h.handleError(w, err)
 		return
 	}
 
 	// Отдаем ответ
 	pkg.SendJSON(h.logger, w, domain.TaskResponse{TaskID: taskID, Waves: waves}, http.StatusCreated)
+}
+
+func (h *Handlers) GetTaskStatus(w http.ResponseWriter, r *http.Request) {
+	taskID := r.PathValue("taskID")
+	if taskID == "" {
+		pkg.SendError(h.logger, w, fmt.Errorf("task id is empty"), http.StatusBadRequest)
+		return
+	}
+
+	status, err := h.taskLoader.GetStatus(r.Context(), domain.Task(taskID))
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	pkg.SendJSON(h.logger, w, struct {
+		TaskID domain.Task    `json:"task_id"`
+		Status pkg.TaskStatus `json:"status"`
+	}{TaskID: domain.Task(taskID), Status: status}, http.StatusOK)
+}
+
+func (h *Handlers) GetHistory(w http.ResponseWriter, r *http.Request) {
+	username, ok := middleware.GetUsernameFromContext(r.Context())
+	if !ok {
+		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
+		return
+	}
+
+	history, err := h.taskLoader.GetHistory(r.Context(), username)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	pkg.SendJSON(h.logger, w, history, http.StatusOK)
+}
+
+func (h *Handlers) DeleteHistory(w http.ResponseWriter, r *http.Request) {
+	username, ok := middleware.GetUsernameFromContext(r.Context())
+	if !ok {
+		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
+		return
+	}
+
+	if err := h.taskLoader.DeleteHistory(r.Context(), username); err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handlers) handleError(w http.ResponseWriter, err error) {

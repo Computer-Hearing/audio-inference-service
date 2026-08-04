@@ -45,7 +45,8 @@ type IsRetryableFunc func(err error) bool
 // или если IsRetryableFunc вернула false для конкретной ошибки.
 func RetryDo(ctx context.Context, cfg *RetryConfig, fn RetryableFunc, isRetryable IsRetryableFunc) error {
 	if cfg == nil {
-		*cfg = DefaultConfig()
+		c := DefaultConfig()
+		cfg = &c
 	}
 
 	if isRetryable == nil {

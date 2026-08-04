@@ -7,6 +7,7 @@ type TaskStatus string
 const (
 	// User
 	UsernameCookieKey = "username"
+	UsernameHeaderKey = "X-Username"
 	FormDataAudioKey  = "audio"
 
 	// Validate Chunks
