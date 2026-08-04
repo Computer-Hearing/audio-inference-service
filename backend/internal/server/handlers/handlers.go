@@ -36,11 +36,13 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	// генерируем таску
 	taskID := domain.GenerateTaskID(username.String())
 	// получаем чанки - раздробленный звуковой файл на несколько по две секунды, переведенные в байты
+
 	ch, err := chunks.ChunksFromRequest(r)
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
+
 	// Получаем спектрограмму звуковую, просто массив флоатов, то есть для нас это столбики, чтобы красиво отрисовать звук
 	waves, err := chunks.AudioWaveFromRequest(r)
 	if err != nil {
