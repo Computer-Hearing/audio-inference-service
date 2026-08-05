@@ -74,7 +74,11 @@ func splitAudio(file multipart.File, header *multipart.FileHeader, chunkSeconds 
 	cmd.Stderr = &stderr
 	// выполняем
 	if err := cmd.Run(); err != nil {
-		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
+		return nil, &pkg.APIError{
+			Message:    fmt.Sprintf("ffmpeg: %s", err.Error()),
+			StatusCode: http.StatusInternalServerError,
+			Details:    map[string]string{"stderr": stderr.String()},
+		}
 	}
 
 	// Получаем список названий файлов-чанков из временной этой папки
