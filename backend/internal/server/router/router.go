@@ -12,7 +12,7 @@ func New(logger *slog.Logger, h *handlers.Handlers) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /api/v1/tasks", h.CreateTask)
-	mux.HandleFunc("GET /api/v1/tasks/{taskID}/status", h.GetTaskStatus)
+	mux.HandleFunc("GET /api/v1/tasks/{taskID}", h.GetTask)
 	mux.HandleFunc("GET /api/v1/tasks/history", h.GetHistory)
 	mux.HandleFunc("DELETE /api/v1/tasks/history", h.DeleteHistory)
 

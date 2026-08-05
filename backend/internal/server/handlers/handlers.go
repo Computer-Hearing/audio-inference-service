@@ -58,23 +58,20 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	pkg.SendJSON(h.logger, w, domain.TaskResponse{TaskID: taskID, Waves: waves}, http.StatusCreated)
 }
 
-func (h *Handlers) GetTaskStatus(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {
 	taskID := r.PathValue("taskID")
 	if taskID == "" {
 		pkg.SendError(h.logger, w, fmt.Errorf("task id is empty"), http.StatusBadRequest)
 		return
 	}
 
-	status, err := h.taskLoader.GetStatus(r.Context(), domain.Task(taskID))
+	task, err := h.taskLoader.GetTask(r.Context(), domain.Task(taskID))
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
 
-	pkg.SendJSON(h.logger, w, struct {
-		TaskID domain.Task    `json:"task_id"`
-		Status pkg.TaskStatus `json:"status"`
-	}{TaskID: domain.Task(taskID), Status: status}, http.StatusOK)
+	pkg.SendJSON(h.logger, w, task, http.StatusOK)
 }
 
 func (h *Handlers) GetHistory(w http.ResponseWriter, r *http.Request) {

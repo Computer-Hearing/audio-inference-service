@@ -20,7 +20,7 @@ import (
 
 func init() {
 	level := os.Getenv("LOG_LEVEL")
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: pkg.Loglevel(level), AddSource: true}))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: pkg.GetLoglevel(level), AddSource: true}))
 	slog.SetDefault(logger)
 }
 
@@ -28,7 +28,6 @@ func main() {
 	logger := slog.Default()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	dbPath := envOrDefault("DB_PATH", "sqlite.db")
 	db, err := pkg.SqliteOpen(dbPath, nil)

@@ -26,7 +26,7 @@ func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) err
 	// Обновляем статус в БД короткими транзакциями
 	err := pkg.RetryDo(ctx, nil, func(ctx context.Context) error {
 		if inferErr != nil {
-			return p.TaskManager.StatusFailure(ctx, job.TaskID)
+			return p.TaskManager.StatusFailure(ctx, job.TaskID, result)
 		}
 		return p.TaskManager.StatusSuccess(ctx, job.TaskID, result)
 	}, pkg.IsRetryableError)
@@ -76,7 +76,11 @@ func processAudioChunks(
 func processChunk(ctx context.Context, client *triton.TritonClient, index int, chunk []byte) chunks.ChunkResult {
 	result, err := runRawAudioInference(ctx, client, chunk)
 	if err != nil {
-		return chunks.ChunkResult{ChunkIndex: index, Err: fmt.Errorf("inference failed: %w", err)}
+		return chunks.ChunkResult{
+			ChunkIndex:   index,
+			Err:          fmt.Errorf("inference failed: %w", err),
+			ErrorMessage: err.Error(),
+		}
 	}
 
 	return chunks.ChunkResult{

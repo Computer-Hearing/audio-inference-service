@@ -2,6 +2,7 @@ package domain
 
 import (
 	"audio-inference-service/internal/chunks"
+	"audio-inference-service/pkg"
 	"crypto/md5"
 	"fmt"
 
@@ -27,4 +28,11 @@ type TaskPayload struct {
 type TaskResponse struct {
 	TaskID Task
 	Waves  []float64
+}
+
+// TaskResult задача с её статусом и результатом инференса (если он уже сохранён)
+type TaskResult struct {
+	TaskID Task                        `json:"task_id"`
+	Status pkg.TaskStatus              `json:"status"`
+	Result *chunks.FileInferenceResult `json:"result,omitempty"`
 }

@@ -27,7 +27,7 @@ const (
 	StatusError      TaskStatus = "error"
 )
 
-func Loglevel(level string) slog.Level {
+func GetLoglevel(level string) slog.Level {
 	switch level {
 	case "debug":
 		return slog.LevelDebug
@@ -38,6 +38,6 @@ func Loglevel(level string) slog.Level {
 	case "error":
 		return slog.LevelError
 	default:
-		return slog.LevelDebug
+		return slog.LevelInfo
 	}
 }

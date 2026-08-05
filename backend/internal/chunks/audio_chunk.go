@@ -111,10 +111,11 @@ type InferenceResult struct {
 
 // ChunkResult результат инференса одного чанка с привязкой к его индексу
 type ChunkResult struct {
-	ChunkIndex int       `json:"chunk_index"`
-	Category   []float32 `json:"category"`
-	Target     []float32 `json:"target"`
-	Err        error     `json:"error"`
+	ChunkIndex   int       `json:"chunk_index"`
+	Category     []float32 `json:"category"`
+	Target       []float32 `json:"target"`
+	Err          error     `json:"-"`
+	ErrorMessage string    `json:"error,omitempty"`
 }
 
 // FileInferenceResult агрегированный результат по всему файлу

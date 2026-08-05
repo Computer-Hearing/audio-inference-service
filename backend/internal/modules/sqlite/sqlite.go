@@ -19,35 +19,55 @@ func NewSQLiteTaskManager(db *sql.DB) *sqliteTaskManager {
 	return &sqliteTaskManager{db: db}
 }
 
-func (m *sqliteTaskManager) GetStatus(ctx context.Context, taskID domain.Task) (pkg.TaskStatus, error) {
+func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task) (*domain.TaskResult, error) {
 	if string(taskID) == "" {
-		return "", pkg.APIError{
+		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
 			Message:    "Validation failed",
 			Details:    map[string]string{"taskID": "cannot be empty"},
 		}
 	}
 
-	var status string
-	query := `SELECT status FROM tasks WHERE id = ?`
+	var (
+		status     string
+		resultJSON string
+	)
+	query := `SELECT status, result FROM tasks WHERE id = ?`
 
-	err := m.db.QueryRowContext(ctx, query, taskID).Scan(&status)
+	err := m.db.QueryRowContext(ctx, query, taskID).Scan(&status, &resultJSON)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", pkg.APIError{
+			return nil, pkg.APIError{
 				StatusCode: http.StatusNotFound,
 				Message:    "Task not found",
 				Details:    map[string]string{"taskID": string(taskID)},
 			}
 		}
-		return "", pkg.APIError{
+		return nil, pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while getting task status",
+			Message:    "Database error while getting task",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
 
-	return pkg.TaskStatus(status), nil
+	taskResult := &domain.TaskResult{
+		TaskID: taskID,
+		Status: pkg.TaskStatus(status),
+	}
+
+	if resultJSON != "" {
+		var res chunks.FileInferenceResult
+		if err := json.Unmarshal([]byte(resultJSON), &res); err != nil {
+			return nil, pkg.APIError{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "Failed to unmarshal task result",
+				Details:    map[string]string{"taskID": string(taskID), "error": err.Error()},
+			}
+		}
+		taskResult.Result = &res
+	}
+
+	return taskResult, nil
 }
 
 func (m *sqliteTaskManager) GetHistory(ctx context.Context, username domain.Username) ([]*chunks.FileInferenceResult, error) {
@@ -297,7 +317,7 @@ func (m *sqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Tas
 	return nil
 }
 
-func (m *sqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Task) error {
+func (m *sqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Task, result *chunks.FileInferenceResult) error {
 	if string(taskID) == "" {
 		return pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -306,14 +326,28 @@ func (m *sqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Tas
 		}
 	}
 
+	var resultJSON interface{}
+	if result != nil {
+		raw, err := json.Marshal(result)
+		if err != nil {
+			return pkg.APIError{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "Failed to marshal partial result data",
+				Details:    map[string]string{"error": err.Error()},
+			}
+		}
+		resultJSON = string(raw)
+	}
+
 	query := `
 		UPDATE tasks 
 		SET status = 'failure', 
+		    result = ?, 
 		    updated_at = CURRENT_TIMESTAMP 
 		WHERE id = ?
 	`
 
-	_, err := m.db.ExecContext(ctx, query, taskID)
+	_, err := m.db.ExecContext(ctx, query, resultJSON, taskID)
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
