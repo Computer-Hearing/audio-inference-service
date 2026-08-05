@@ -9,7 +9,7 @@ import (
 // TaskManager - реализация должна уметь работать с задачами в бд, операции соответствуют методам
 type TaskManager interface {
 	// GetTask - получить задачу: её статус и результат инференса, если он уже сохранён
-	GetTask(ctx context.Context, taskID domain.Task) (*domain.TaskResult, error)
+	GetTask(ctx context.Context, taskID domain.Task, username domain.Username) (*domain.TaskResult, error)
 	// GetHistory - получить всю историю запросов
 	GetHistory(ctx context.Context, username domain.Username) ([]*chunks.FileInferenceResult, error)
 	// DeleteHistory - очистить всю историю запросов

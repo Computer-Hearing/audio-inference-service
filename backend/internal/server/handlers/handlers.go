@@ -61,13 +61,19 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {
+	username, ok := middleware.GetUsernameFromContext(r.Context())
+	if !ok {
+		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
+		return
+	}
+
 	taskID := r.PathValue("taskID")
 	if taskID == "" {
 		pkg.SendError(h.logger, w, fmt.Errorf("task id is empty"), http.StatusBadRequest)
 		return
 	}
 
-	task, err := h.taskLoader.GetTask(r.Context(), domain.Task(taskID))
+	task, err := h.taskLoader.GetTask(r.Context(), domain.Task(taskID), username)
 	if err != nil {
 		h.handleError(w, err)
 		return

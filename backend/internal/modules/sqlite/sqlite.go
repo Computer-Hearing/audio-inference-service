@@ -19,7 +19,8 @@ func NewSQLiteTaskManager(db *sql.DB) *sqliteTaskManager {
 	return &sqliteTaskManager{db: db}
 }
 
-func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task) (*domain.TaskResult, error) {
+func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
+	username domain.Username) (*domain.TaskResult, error) {
 	if string(taskID) == "" {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -32,9 +33,9 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task) (*d
 		status     string
 		resultJSON string
 	)
-	query := `SELECT status, result FROM tasks WHERE id = ?`
+	query := `SELECT status, result FROM tasks WHERE username = ? and id = ?`
 
-	err := m.db.QueryRowContext(ctx, query, taskID).Scan(&status, &resultJSON)
+	err := m.db.QueryRowContext(ctx, query, username, taskID).Scan(&status, &resultJSON)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, pkg.APIError{
