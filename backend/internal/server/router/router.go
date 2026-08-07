@@ -7,19 +7,18 @@ import (
 	"net/http"
 )
 
-// New собирает HTTP-роутер: маршруты плюс мидлвары (recovery -> logging -> auth)
 func New(logger *slog.Logger, h *handlers.Handlers) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /api/v1/tasks", h.CreateTask)
-	mux.HandleFunc("GET /api/v1/tasks/{taskID}", h.GetTask)
-	mux.HandleFunc("GET /api/v1/tasks/history", h.GetHistory)
-	mux.HandleFunc("DELETE /api/v1/tasks/history", h.DeleteHistory)
-	mux.HandleFunc("GET /api/v1/models", h.ListModels)
+	mux.Handle("POST /api/v1/tasks", middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.CreateTask)))
+	mux.Handle("GET /api/v1/tasks/{taskID}", middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.GetTask)))
+	mux.Handle("GET /api/v1/tasks/history", middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.GetHistory)))
+	mux.Handle("DELETE /api/v1/tasks/history", middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.DeleteHistory)))
+	mux.Handle("GET /api/v1/models", middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.ListModels)))
+
+	mux.HandleFunc("POST /api/v1/register", h.Register)
 
 	return middleware.Recovery(logger)(
-		middleware.Logging(logger)(
-			middleware.CheckUsernameCookie(logger)(mux),
-		),
+		middleware.Logging(logger)(mux),
 	)
 }

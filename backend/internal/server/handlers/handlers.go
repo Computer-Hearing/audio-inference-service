@@ -6,6 +6,7 @@ import (
 	"audio-inference-service/internal/middleware"
 	"audio-inference-service/internal/modules"
 	"audio-inference-service/pkg"
+	"os"
 
 	"errors"
 	"fmt"
@@ -141,6 +142,43 @@ func (h *Handlers) DeleteHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
+	if cookie, err := r.Cookie(pkg.UsernameCookieKey); err == nil {
+		h.handleError(w, pkg.APIError{
+			StatusCode: http.StatusConflict,
+			Message:    "user already authenticated",
+			Details: map[string]string{
+				"username":    cookie.Value,
+				"re-register": "empty cookie to re-register",
+			},
+		})
+		return
+	}
+
+	var registerRequest struct {
+		Username string `json:"username"`
+	}
+
+	if err := pkg.ParseJSONBody(r, &registerRequest); err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	username := pkg.UsernameGenerator(registerRequest.Username)
+	h.logger.Info("Registering", "username", username)
+	http.SetCookie(w, &http.Cookie{
+		Name:     pkg.UsernameCookieKey,
+		Value:    username,
+		Path:     "/",
+		MaxAge:   2147483647,
+		HttpOnly: true,
+		Secure:   os.Getenv("ENV") == "production",
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (h *Handlers) handleError(w http.ResponseWriter, err error) {
