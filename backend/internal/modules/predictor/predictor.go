@@ -20,8 +20,13 @@ type Predictor struct {
 }
 
 func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) error {
+	modelName := job.ModelName
+	if modelName == "" {
+		modelName = pkg.DefaultModelName
+	}
+
 	// База данных свободна, пока мы делаем долгий сетевой запрос к Тритону
-	result, inferErr := processAudioChunks(ctx, p.TritonConnector, job.Chunks)
+	result, inferErr := processAudioChunks(ctx, p.TritonConnector, modelName, job.Chunks)
 
 	// Обновляем статус в БД короткими транзакциями
 	err := pkg.RetryDo(ctx, nil, func(ctx context.Context) error {
@@ -45,6 +50,7 @@ func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) err
 func processAudioChunks(
 	ctx context.Context,
 	client *triton.TritonClient,
+	modelName string,
 	audio chunks.AudioChunks) (*chunks.FileInferenceResult, error) {
 
 	results := make([]chunks.ChunkResult, len(audio.Chunks))
@@ -56,7 +62,7 @@ func processAudioChunks(
 		sem <- struct{}{}
 		g.Go(func() error {
 			defer func() { <-sem }()
-			results[i] = processChunk(ctx, client, i, chunk)
+			results[i] = processChunk(ctx, client, modelName, i, chunk)
 			return nil // ошибки чанка не пробрасываем наверх, они уже в results[i].Err
 		})
 	}
@@ -73,8 +79,8 @@ func processAudioChunks(
 }
 
 // processChunk отправляет один чанк в Triton
-func processChunk(ctx context.Context, client *triton.TritonClient, index int, chunk []byte) chunks.ChunkResult {
-	result, err := runRawAudioInference(ctx, client, chunk)
+func processChunk(ctx context.Context, client *triton.TritonClient, modelName string, index int, chunk []byte) chunks.ChunkResult {
+	result, err := runRawAudioInference(ctx, client, modelName, chunk)
 	if err != nil {
 		return chunks.ChunkResult{
 			ChunkIndex:   index,
@@ -94,10 +100,11 @@ func processChunk(ctx context.Context, client *triton.TritonClient, index int, c
 func runRawAudioInference(
 	ctx context.Context,
 	client *triton.TritonClient,
+	modelName string,
 	chunk []byte) (*chunks.InferenceResult, error) {
 
 	req := &gen.ModelInferRequest{
-		ModelName: pkg.PipelineModelName,
+		ModelName: modelName,
 		Inputs: []*gen.ModelInferRequest_InferInputTensor{
 			{
 				Name:     pkg.RawAudioInputName,

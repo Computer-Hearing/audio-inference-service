@@ -15,6 +15,7 @@ func New(logger *slog.Logger, h *handlers.Handlers) http.Handler {
 	mux.HandleFunc("GET /api/v1/tasks/{taskID}", h.GetTask)
 	mux.HandleFunc("GET /api/v1/tasks/history", h.GetHistory)
 	mux.HandleFunc("DELETE /api/v1/tasks/history", h.DeleteHistory)
+	mux.HandleFunc("GET /api/v1/models", h.ListModels)
 
 	return middleware.Recovery(logger)(
 		middleware.Logging(logger)(

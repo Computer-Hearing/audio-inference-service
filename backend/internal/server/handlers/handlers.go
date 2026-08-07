@@ -15,11 +15,12 @@ import (
 
 type Handlers struct {
 	taskLoader modules.TaskManager
+	catalog    modules.Catalog
 	logger     *slog.Logger
 }
 
-func New(taskLoader modules.TaskManager, logger *slog.Logger) *Handlers {
-	return &Handlers{taskLoader: taskLoader, logger: logger}
+func New(taskLoader modules.TaskManager, logger *slog.Logger, catalog modules.Catalog) *Handlers {
+	return &Handlers{taskLoader: taskLoader, catalog: catalog, logger: logger}
 }
 
 func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +34,25 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 		h.handleError(w, err)
 		return
 	}
+
+	// Модель для инференса: заголовок X-Model, по умолчанию default-модель
+	modelName := r.Header.Get(pkg.ModelHeaderKey)
+	if modelName == "" {
+		modelName = pkg.DefaultModelName
+	}
+
+	available, err := h.catalog.IsAvailable(r.Context(), modelName)
+	if err != nil {
+		// Тритон недоступен — разрешаем только дефолтную модель, остальное отклоняем
+		if modelName != pkg.DefaultModelName {
+			pkg.SendError(h.logger, w, fmt.Errorf("model catalog unavailable, cannot verify model"), http.StatusServiceUnavailable)
+			return
+		}
+	} else if !available {
+		pkg.SendError(h.logger, w, fmt.Errorf("unknown or unsupported model: %s", modelName), http.StatusBadRequest)
+		return
+	}
+
 	// генерируем таску
 	taskID := domain.GenerateTaskID(username.String())
 	// получаем чанки - раздробленный звуковой файл на несколько по две секунды, переведенные в байты
@@ -51,13 +71,23 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создаем таску
-	if err := h.taskLoader.CreateTask(r.Context(), username, taskID, *ch, waves); err != nil {
+	if err := h.taskLoader.CreateTask(r.Context(), username, taskID, *ch, waves, modelName); err != nil {
 		h.handleError(w, err)
 		return
 	}
 
 	// Отдаем ответ
-	pkg.SendJSON(h.logger, w, domain.TaskResponse{TaskID: taskID, Waves: waves}, http.StatusCreated)
+	pkg.SendJSON(h.logger, w, domain.TaskResponse{TaskID: taskID, Waves: waves, Model: modelName}, http.StatusCreated)
+}
+
+func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
+	models, err := h.catalog.List(r.Context())
+	if err != nil {
+		pkg.SendError(h.logger, w, fmt.Errorf("model catalog unavailable: %w", err), http.StatusServiceUnavailable)
+		return
+	}
+
+	pkg.SendJSON(h.logger, w, models, http.StatusOK)
 }
 
 func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {

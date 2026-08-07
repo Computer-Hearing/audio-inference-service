@@ -32,10 +32,11 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 	var (
 		status     string
 		resultJSON string
+		model      string
 	)
-	query := `SELECT status, result FROM tasks WHERE username = ? and id = ?`
+	query := `SELECT status, result, model FROM tasks WHERE username = ? and id = ?`
 
-	err := m.db.QueryRowContext(ctx, query, username, taskID).Scan(&status, &resultJSON)
+	err := m.db.QueryRowContext(ctx, query, username, taskID).Scan(&status, &resultJSON, &model)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, pkg.APIError{
@@ -54,6 +55,7 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 	taskResult := &domain.TaskResult{
 		TaskID: taskID,
 		Status: pkg.TaskStatus(status),
+		Model:  model,
 	}
 
 	if resultJSON != "" {
@@ -149,7 +151,7 @@ func (m *sqliteTaskManager) DeleteHistory(ctx context.Context, username domain.U
 
 func (m *sqliteTaskManager) CreateTask(
 	ctx context.Context, username domain.Username,
-	taskID domain.Task, audioChunks chunks.AudioChunks, wave []float64) error {
+	taskID domain.Task, audioChunks chunks.AudioChunks, wave []float64, modelName string) error {
 	// Валидация всех полей
 	details := make(map[string]string)
 	if string(username) == "" {
@@ -160,6 +162,9 @@ func (m *sqliteTaskManager) CreateTask(
 	}
 	if len(audioChunks.Chunks) == 0 {
 		details["chunks"] = "must contain at least one audio chunk"
+	}
+	if modelName == "" {
+		details["model"] = "cannot be empty"
 	}
 	if len(wave) == 0 {
 		// Спектрограмму пока что пустой пропускаем, если есть, посмотрим потом.
@@ -193,11 +198,11 @@ func (m *sqliteTaskManager) CreateTask(
 	}
 
 	query := `
-		INSERT INTO tasks (id, username, status, chunks, wave, created_at, updated_at) 
-		VALUES (?, ?, 'pending', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		INSERT INTO tasks (id, username, status, model, chunks, wave, created_at, updated_at) 
+		VALUES (?, ?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`
 
-	_, err = m.db.ExecContext(ctx, query, taskID, username, string(chunksJSON), string(waveJSON))
+	_, err = m.db.ExecContext(ctx, query, taskID, username, modelName, string(chunksJSON), string(waveJSON))
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -231,7 +236,7 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 			ORDER BY created_at ASC
 			LIMIT ?
 		)
-		RETURNING id, chunks
+		RETURNING id, chunks, model
 	`
 
 	rows, err := m.db.QueryContext(ctx, query, limit)
@@ -246,9 +251,9 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 
 	var payloads []domain.TaskPayload
 	for rows.Next() {
-		var taskID, chunksJSON string
+		var taskID, chunksJSON, model string
 
-		if err := rows.Scan(&taskID, &chunksJSON); err != nil {
+		if err := rows.Scan(&taskID, &chunksJSON, &model); err != nil {
 			return nil, pkg.APIError{
 				StatusCode: http.StatusInternalServerError,
 				Message:    "Database error while scanning processing task payload",
@@ -264,8 +269,9 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 		}
 
 		payloads = append(payloads, domain.TaskPayload{
-			TaskID: domain.Task(taskID),
-			Chunks: c,
+			TaskID:    domain.Task(taskID),
+			ModelName: model,
+			Chunks:    c,
 		})
 	}
 

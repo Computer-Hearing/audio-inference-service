@@ -248,3 +248,110 @@ func (c *TritonClient) Stats() (total, failed int64, lastRequest time.Time) {
 	defer c.mu.RUnlock()
 	return c.requestsTotal, c.requestsFailed, c.lastRequestTime
 }
+
+// RepositoryIndexModel запись индекса репозитория моделей
+type RepositoryIndexModel struct {
+	Name    string
+	Version string
+	State   string
+	Reason  string
+}
+
+// TritonTensor описание входного/выходного тензора модели
+type TritonTensor struct {
+	Name     string
+	Datatype string // "TYPE_UINT8" и т.п.
+	Shape    []int64
+}
+
+// TritonModelConfig конфигурация модели
+type TritonModelConfig struct {
+	Name         string
+	Backend      string
+	MaxBatchSize int32
+	Inputs       []TritonTensor
+	Outputs      []TritonTensor
+}
+
+// RepositoryIndex возвращает список моделей из репозитория Тритона
+func (c *TritonClient) RepositoryIndex(ctx context.Context) ([]RepositoryIndexModel, error) {
+	client, err := c.currentClient()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.config.Timeout)
+	defer cancel()
+
+	resp, err := client.RepositoryIndex(ctx, &pb.RepositoryIndexRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("repository index failed: %w", err)
+	}
+
+	models := make([]RepositoryIndexModel, 0, len(resp.Models))
+	for _, m := range resp.Models {
+		models = append(models, RepositoryIndexModel{
+			Name:    m.GetName(),
+			Version: m.GetVersion(),
+			State:   m.GetState(),
+			Reason:  m.GetReason(),
+		})
+	}
+
+	return models, nil
+}
+
+// ModelConfig возвращает конфигурацию модели по её имени
+func (c *TritonClient) ModelConfig(ctx context.Context, modelName string) (*TritonModelConfig, error) {
+	client, err := c.currentClient()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.config.Timeout)
+	defer cancel()
+
+	resp, err := client.ModelConfig(ctx, &pb.ModelConfigRequest{Name: modelName})
+	if err != nil {
+		return nil, fmt.Errorf("model config for %s failed: %w", modelName, err)
+	}
+
+	cfg := resp.GetConfig()
+	if cfg == nil {
+		return nil, fmt.Errorf("model config for %s is empty", modelName)
+	}
+
+	result := &TritonModelConfig{
+		Name:         cfg.GetName(),
+		Backend:      cfg.GetBackend(),
+		MaxBatchSize: cfg.GetMaxBatchSize(),
+	}
+
+	for _, in := range cfg.GetInput() {
+		result.Inputs = append(result.Inputs, TritonTensor{
+			Name:     in.GetName(),
+			Datatype: in.GetDataType().String(),
+			Shape:    in.GetDims(),
+		})
+	}
+	for _, out := range cfg.GetOutput() {
+		result.Outputs = append(result.Outputs, TritonTensor{
+			Name:     out.GetName(),
+			Datatype: out.GetDataType().String(),
+			Shape:    out.GetDims(),
+		})
+	}
+
+	return result, nil
+}
+
+// currentClient возвращает активный gRPC-клиент
+func (c *TritonClient) currentClient() (pb.GRPCInferenceServiceClient, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if !c.isConnected {
+		return nil, fmt.Errorf("client not connected")
+	}
+	return c.client, nil
+}

@@ -8,6 +8,7 @@ const (
 	// User
 	UsernameCookieKey = "username"
 	UsernameHeaderKey = "X-Username"
+	ModelHeaderKey    = "X-Model"
 	FormDataAudioKey  = "audio"
 
 	// Validate Chunks
@@ -15,11 +16,12 @@ const (
 	AudioWaveBucketsLen  = 40
 
 	// Triton
-	CategoryOutputName   = "category_output"
-	TargetOutputName     = "target_output"
-	PipelineModelName    = "cnn_predict_pipline"
-	RawAudioInputName    = "RAW_AUDIO"
-	MaxTritonConcurrency = 4
+	CategoryOutputName    = "category_output"
+	TargetOutputName      = "target_output"
+	DefaultModelName      = "cnn_predict_pipline"
+	RawAudioInputName     = "RAW_AUDIO"
+	RawAudioInputDatatype = "TYPE_UINT8"
+	MaxTritonConcurrency  = 8
 
 	// Статусы задач
 	StatusProcessing TaskStatus = "processing"

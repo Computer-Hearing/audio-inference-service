@@ -1,6 +1,7 @@
 package main
 
 import (
+	"audio-inference-service/internal/modules/catalog"
 	"audio-inference-service/internal/modules/predictor"
 	"audio-inference-service/internal/modules/sqlite"
 	"audio-inference-service/internal/modules/taskpipe"
@@ -61,7 +62,8 @@ func main() {
 	// Запускаем воркеры и диспетчера задач
 	taskpipe.StartPipeline(ctx, taskManager, predict)
 
-	handlers := handlers.New(taskManager, logger)
+	modelCatalog := catalog.NewTritonCatalog(tritonClient, 30*time.Second)
+	handlers := handlers.New(taskManager, logger, modelCatalog)
 	httpAddr := envOrDefault("HTTP_ADDR", ":8080")
 	srv := &http.Server{
 		Addr:         httpAddr,

@@ -21,18 +21,21 @@ func GenerateTaskID(userName string) Task {
 }
 
 type TaskPayload struct {
-	TaskID Task
-	Chunks chunks.AudioChunks
+	TaskID    Task
+	ModelName string
+	Chunks    chunks.AudioChunks
 }
 
 type TaskResponse struct {
-	TaskID Task
-	Waves  []float64
+	TaskID Task      `json:"task_id"`
+	Waves  []float64 `json:"waves"`
+	Model  string    `json:"model,omitempty"`
 }
 
 // TaskResult задача с её статусом и результатом инференса (если он уже сохранён)
 type TaskResult struct {
 	TaskID Task                        `json:"task_id"`
 	Status pkg.TaskStatus              `json:"status"`
+	Model  string                      `json:"model,omitempty"`
 	Result *chunks.FileInferenceResult `json:"result,omitempty"`
 }
