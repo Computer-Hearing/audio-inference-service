@@ -36,10 +36,11 @@ const (
 	RawAudioInputDatatype = "TYPE_UINT8"
 	MaxTritonConcurrency  = 8
 
-	// Статусы задач
-	StatusProcessing TaskStatus = "processing"
-	StatusSuccess    TaskStatus = "success"
-	StatusError      TaskStatus = "error"
+	UsernameFirstMin     = 4
+	UsernameFirstMax     = 128
+	UsernameSecond       = 13
+	UsernameThird        = 10
+	UsernameDelimiterLen = 1
 )
 
 func GetLoglevel(level string) slog.Level {
@@ -69,9 +70,8 @@ func UsernameGenerator(first string) string {
 
 func randWord() string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const length = 13
 
-	result := make([]byte, length)
+	result := make([]byte, UsernameSecond)
 	for i := range result {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {

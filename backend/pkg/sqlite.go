@@ -74,7 +74,7 @@ func tables(db *sql.DB) error {
     		id TEXT PRIMARY KEY,
     		username TEXT NOT NULL,
     		status TEXT NOT NULL,          -- 'pending', 'processing', 'success', 'failure'
-    		model TEXT NOT NULL DEFAULT '', -- модель для инференса
+    		model TEXT NOT NULL, 		   -- модель для инференса
     		chunks TEXT,                   -- JSON: chunks.AudioChunks
     		wave TEXT,                     -- JSON: []float64
     		result TEXT,                   -- JSON: chunks.FileInferenceResult

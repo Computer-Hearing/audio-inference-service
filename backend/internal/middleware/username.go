@@ -12,16 +12,17 @@ const UserContextKey = "username"
 
 func CheckUsernameCookie(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		username := r.Header.Get(pkg.UsernameHeaderKey)
-		if username == "" {
-			cookie, err := r.Cookie(pkg.UsernameCookieKey)
-			if err != nil {
-				w.WriteHeader(http.StatusUnauthorized)
-				_, _ = w.Write([]byte(`user is unauthorized`))
-				logger.Warn("user is unauthorized", "ip", r.RemoteAddr, "userAgent", r.UserAgent())
-				return
-			}
-			username = cookie.Value
+		cookie, err := r.Cookie(pkg.UsernameCookieKey)
+		if err != nil {
+			pkg.SendError(logger, w, err, http.StatusUnauthorized)
+			logger.Warn("user is unauthorized", "ip", r.RemoteAddr, "userAgent", r.UserAgent())
+			return
+		}
+		username := cookie.Value
+
+		if err := domain.ToUsername(username).IsValid(); err != nil {
+			pkg.HandleError(w, logger, err)
+			return
 		}
 
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), UserContextKey, username)))

@@ -8,7 +8,6 @@ import (
 	"audio-inference-service/pkg"
 	"os"
 
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -182,10 +181,5 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) handleError(w http.ResponseWriter, err error) {
-	var errApi pkg.APIError
-	if errors.As(err, &errApi) {
-		pkg.SendError(h.logger, w, &errApi, errApi.StatusCode)
-		return
-	}
-	pkg.SendError(h.logger, w, err, http.StatusInternalServerError)
+	pkg.HandleError(w, h.logger, err)
 }
