@@ -22,7 +22,7 @@ const (
 	ModelHeaderKey    = "X-Model"
 	FormDataAudioKey  = "audio"
 	DefaultUsername   = "Anonim"
-	UsernameRX        = `^([a-zA-Z0-9_]+)-([a-zA-Z]+)-([0-9]+)$`
+	UsernameRX        = `^([a-zA-Z0-9_]+)-([a-zA-Z0-9]+)-([0-9]+)$`
 
 	// Validate Chunks
 	SecondsPerAudioChunk = 2

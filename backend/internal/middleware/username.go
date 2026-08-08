@@ -19,7 +19,6 @@ func CheckUsernameCookie(logger *slog.Logger, next http.Handler) http.Handler {
 			return
 		}
 		username := cookie.Value
-
 		if err := domain.ToUsername(username).IsValid(); err != nil {
 			pkg.HandleError(w, logger, err)
 			return
