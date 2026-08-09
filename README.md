@@ -49,10 +49,10 @@ Multi-task классификация звуков дорожного трафи
 |--------|--------|----------|------|-----------|------------|-------------|------------|--------------|
 | CNN | PyTorch | None | мел-спектрограмма (2D) | — | — | 96.0% | 88.0% | — |
 | Transformer (PyTorch) | PyTorch | PANNs | 4 × 2048 | — | — | 97.0% | 89.0% | — |
-| LSTM v1 | TensorFlow | YAMNet | 4 × 1024 | 1.58M | 8.30 | 97.8% | 84.8% | 84.0% |
-| LSTM v2 | TensorFlow | YAMNet | 4 × 1024 | 645K | 9.44 | 97.8% | 87.0% | 86.0% |
-| Transformer v1 | TensorFlow | YAMNet | 4 × 1024 | 17.10M | 8.68 | 95.3% | 79.6% | 77.0% |
-| Transformer v2 | TensorFlow | YAMNet | 4 × 1024 | 544K | 12.61 | 97.8% | 89.8% | 89.0% |
+| LSTM v1 | TensorFlow | YAMNet | 4 × 768 | 1.58M | 8.30 | 97.8% | 84.8% | 84.0% |
+| LSTM v2 | TensorFlow | YAMNet | 4 × 768 | 645K | 9.44 | 97.8% | 87.0% | 86.0% |
+| Transformer v1 | TensorFlow | YAMNet | 4 × 768 | 17.10M | 8.68 | 95.3% | 79.6% | 77.0% |
+| Transformer v2 | TensorFlow | YAMNet | 4 × 768 | 544K | 12.61 | 97.8% | 89.8% | 89.0% |
 | RNN | TensorFlow | YAMNet | 4 × 1024 | — | — | — | — | — |
 | MLP | TensorFlow | None | мел-спектрограмма (вытянутая) + PCA | — | — | — | — | — |
 
@@ -70,21 +70,21 @@ Multi-task классификация звуков дорожного трафи
 - **Структура:** Positional Encoding → Multi-head Self-Attention → Feed Forward → LayerNorm → 2 головы (softmax)
 
 ### LSTM v1 (TensorFlow)
-- **Эмбеддер:** YAMNet (4 кадра × 1024 признака)
+- **Эмбеддер:** YAMNet (4 кадра × 768 признака)
 - **Архитектура:** LSTM(256, return_sequences=True) → Dropout(0.3) → LSTM(128) → Dropout(0.3) → Dense(256) → Dense(128) → Dense(64) → 2 головы
 - **Параметры:** 1.58M
 - **Время:** 8.30 мс
 
 ### LSTM v2 (TensorFlow) — улучшенная версия
-- **Эмбеддер:** YAMNet (4 кадра × 1024 признака)
+- **Эмбеддер:** YAMNet (4 кадра × 768 признака)
 - **Архитектура:** LSTM(128, dropout=0.2, recurrent_dropout=0.2) → BatchNorm → LSTM(64, dropout=0.2, recurrent_dropout=0.2) → BatchNorm → Dropout(0.3) → Dense(64) → Dropout(0.3) → 2 головы
 - **Ключевые улучшения:** уменьшение параметров в 2.4 раза, BatchNormalization, dropout внутри LSTM
 - **Параметры:** 645K
 - **Время:** 9.44 мс
 
 ### Transformer v1 (TensorFlow)
-- **Эмбеддер:** YAMNet (4 кадра × 1024 признака)
-- **Архитектура:** Positional Encoding → 2× (MultiHeadAttention(4 heads) → FFN(Dense 2048 → 1024)) → GlobalAvgPooling → Dense(256) → Dense(128) → 2 головы
+- **Эмбеддер:** YAMNet (4 кадра × 768 признака)
+- **Архитектура:** Positional Encoding → 2× (MultiHeadAttention(4 heads) → FFN → GlobalAvgPooling → Dense(256) → Dense(128) → 2 головы
 - **Параметры:** 17.10M
 - **Время:** 8.68 мс
 - **Недостатки:** переобучение на малом датасете, избыточная сложность
