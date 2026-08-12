@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // SQLiteConfig содержит параметры подключения и настройки пула для SQLite
@@ -24,7 +24,7 @@ func DefaultSQLiteConfig(dbPath *string) SQLiteConfig {
 	if dbPath != nil {
 		baseDBPath = *dbPath
 	}
-	dsn := fmt.Sprintf("file:%s?_journal=WAL&_busy_timeout=5000&_fk=true", baseDBPath)
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)", baseDBPath)
 	return SQLiteConfig{
 		DBPath:          dsn,
 		MaxOpenConns:    10,              // Ограничиваем конкурентность для записи
@@ -40,14 +40,14 @@ func SqliteOpen(dbPath string, conf *SQLiteConfig) (*sql.DB, error) {
 		cfg = *conf
 	}
 
-	// _journal=WAL: включает Write-Ahead Logging (чтение не блокирует запись)
-	// _busy_timeout=5000: ждет до 5 секунд, если база заблокирована, вместо ошибки
-	// _fk=true: включает поддержку внешних ключей (Foreign Keys)
-	dsn := fmt.Sprintf("%s?_journal=WAL&_busy_timeout=5000&_fk=true", dbPath)
+	// _pragma=journal_mode(WAL): включает Write-Ahead Logging (чтение не блокирует запись)
+	// _pragma=busy_timeout(5000): ждет до 5 секунд, если база заблокирована, вместо ошибки
+	// _pragma=foreign_keys(1): включает поддержку внешних ключей (Foreign Keys)
+	dsn := fmt.Sprintf("%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)", dbPath)
 
-	db, err := sql.Open("sqlite3", dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open sqlite3 db: %v", err)
+		return nil, fmt.Errorf("open sqlite db: %v", err)
 	}
 
 	if err := db.Ping(); err != nil {

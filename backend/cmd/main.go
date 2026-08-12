@@ -1,6 +1,7 @@
 package main
 
 import (
+	"audio-inference-service/internal/config"
 	"audio-inference-service/internal/modules/catalog"
 	"audio-inference-service/internal/modules/predictor"
 	"audio-inference-service/internal/modules/sqlite"
@@ -19,28 +20,27 @@ import (
 	"time"
 )
 
-func init() {
-	level := os.Getenv("LOG_LEVEL")
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: pkg.GetLoglevel(level), AddSource: true}))
-	slog.SetDefault(logger)
-}
-
 func main() {
-	logger := slog.Default()
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("failed to load config", "err", err.Error())
+		os.Exit(1)
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: pkg.GetLoglevel(cfg.LogLevel), AddSource: true}))
+	slog.SetDefault(logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	dbPath := envOrDefault("DB_PATH", "sqlite.db")
-	db, err := pkg.SqliteOpen(dbPath, nil)
+	db, err := pkg.SqliteOpen(cfg.DBPath, nil)
 	if err != nil {
 		logger.Error("failed to open sqlite database", "err", err.Error())
 		os.Exit(1)
 	}
 	defer db.Close()
-	logger.Info("sqlite database opened", "db_path", dbPath)
+	logger.Info("sqlite database opened", "db_path", cfg.DBPath)
 
-	tritonAddr := envOrDefault("TRITON_ADDR", "192.168.3.17:8001")
-	tritonClient, err := triton.NewTritonClient(triton.DefaultConfig(tritonAddr))
+	tritonClient, err := triton.NewTritonClient(triton.DefaultConfig(cfg.TritonAddr))
 	if err != nil {
 		logger.Error("failed to create triton client", "err", err.Error())
 		os.Exit(1)
@@ -48,10 +48,10 @@ func main() {
 	defer tritonClient.Close()
 
 	if err := tritonClient.Connect(ctx); err != nil {
-		logger.Error("failed to connect to triton", "addr", tritonAddr, "err", err.Error())
+		logger.Error("failed to connect to triton", "addr", cfg.TritonAddr, "err", err.Error())
 		os.Exit(1)
 	}
-	logger.Info("connected to triton", "addr", tritonAddr)
+	logger.Info("connected to triton", "addr", cfg.TritonAddr)
 
 	taskManager := sqlite.NewSQLiteTaskManager(db)
 	predict := &predictor.Predictor{
@@ -64,16 +64,15 @@ func main() {
 
 	modelCatalog := catalog.NewTritonCatalog(tritonClient, 30*time.Second)
 	handlers := handlers.New(taskManager, logger, modelCatalog)
-	httpAddr := envOrDefault("HTTP_ADDR", ":8080")
 	srv := &http.Server{
-		Addr:         httpAddr,
+		Addr:         cfg.HTTPAddr,
 		Handler:      router.New(logger, handlers),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 5 * time.Minute,
 	}
 
 	go func() {
-		logger.Info("http server started", "addr", httpAddr)
+		logger.Info("http server started", "addr", cfg.HTTPAddr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("http server failed", "err", err.Error())
 			stop()
@@ -88,11 +87,4 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown failed", "err", err.Error())
 	}
-}
-
-func envOrDefault(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }

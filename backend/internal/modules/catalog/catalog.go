@@ -54,12 +54,12 @@ func NewTritonCatalog(client *triton.TritonClient, ttl time.Duration) *TritonCat
 	}
 }
 
-func (c *TritonCatalog) List(ctx context.Context) ([]ModelInfo, error) {
+func (c *TritonCatalog) List(ctx context.Context, contract pkg.InputContract) ([]ModelInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.cached != nil && time.Since(c.cachedAt) < c.ttl {
-		return c.cached, nil
+		return filterUsable(c.cached, contract), nil
 	}
 
 	models, err := c.fetch(ctx)
@@ -67,28 +67,53 @@ func (c *TritonCatalog) List(ctx context.Context) ([]ModelInfo, error) {
 		// Если кэш уже есть, отдаём его (устаревший), иначе ошибка
 		if c.cached != nil {
 			slog.Warn("failed to refresh model catalog, serving stale cache", "err", err.Error())
-			return c.cached, nil
+			return filterUsable(c.cached, contract), nil
 		}
 		return nil, err
 	}
 
 	c.cached = models
 	c.cachedAt = time.Now()
-	return models, nil
+	return filterUsable(models, contract), nil
 }
 
-func (c *TritonCatalog) IsAvailable(ctx context.Context, modelName string) (bool, error) {
-	models, err := c.List(ctx)
+func (c *TritonCatalog) IsAvailable(ctx context.Context, modelName string, contract pkg.InputContract) (bool, error) {
+	models, err := c.List(ctx, contract)
 	if err != nil {
 		return false, err
 	}
 
 	for _, m := range models {
 		if m.Name == modelName {
-			return m.Usable, nil
+			return true, nil
 		}
 	}
 	return false, nil
+}
+
+// matchesContract проверяет, что модель принимает входной тензор из контракта
+func matchesContract(m ModelInfo, contract pkg.InputContract) bool {
+	for _, in := range m.Inputs {
+		if in.Name == contract.InputName && in.Datatype == contract.InputDatatype {
+			return true
+		}
+	}
+	return false
+}
+
+// filterUsable оставляет только модели подходящие под контракт
+func filterUsable(models []ModelInfo, contract pkg.InputContract) []ModelInfo {
+	usable := models[:0]
+	for _, m := range models {
+		if matchesContract(m, contract) {
+			m.Usable = true
+			usable = append(usable, m)
+		}
+	}
+
+	sort.Slice(usable, func(a, b int) bool { return usable[a].Name < usable[b].Name })
+
+	return usable
 }
 
 func (c *TritonCatalog) fetch(ctx context.Context) ([]ModelInfo, error) {
@@ -115,17 +140,7 @@ func (c *TritonCatalog) fetch(ctx context.Context) ([]ModelInfo, error) {
 		return nil, err
 	}
 
-	// Оставляем только модели, которые сервис реально может вызвать
-	usable := infos[:0]
-	for _, m := range infos {
-		if m.Usable {
-			usable = append(usable, m)
-		}
-	}
-
-	sort.Slice(usable, func(a, b int) bool { return usable[a].Name < usable[b].Name })
-
-	return usable, nil
+	return infos, nil
 }
 
 func (c *TritonCatalog) modelInfo(ctx context.Context, m triton.RepositoryIndexModel) ModelInfo {
@@ -149,9 +164,6 @@ func (c *TritonCatalog) modelInfo(ctx context.Context, m triton.RepositoryIndexM
 
 	for _, in := range cfg.Inputs {
 		info.Inputs = append(info.Inputs, IOInfo{Name: in.Name, Datatype: in.Datatype, Shape: in.Shape})
-		if in.Name == pkg.RawAudioInputName && in.Datatype == pkg.RawAudioInputDatatype {
-			info.Usable = true
-		}
 	}
 	for _, out := range cfg.Outputs {
 		info.Outputs = append(info.Outputs, IOInfo{Name: out.Name, Datatype: out.Datatype, Shape: out.Shape})

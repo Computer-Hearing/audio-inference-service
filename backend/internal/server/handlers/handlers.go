@@ -14,12 +14,12 @@ import (
 )
 
 type Handlers struct {
-	taskLoader modules.TaskManager
+	taskLoader modules.TaskManager[domain.AudioTaskPayload, chunks.FileInferenceResult]
 	catalog    modules.Catalog
 	logger     *slog.Logger
 }
 
-func New(taskLoader modules.TaskManager, logger *slog.Logger, catalog modules.Catalog) *Handlers {
+func New(taskLoader modules.TaskManager[domain.AudioTaskPayload, chunks.FileInferenceResult], logger *slog.Logger, catalog modules.Catalog) *Handlers {
 	return &Handlers{taskLoader: taskLoader, catalog: catalog, logger: logger}
 }
 
@@ -41,7 +41,7 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 		modelName = pkg.DefaultModelName
 	}
 
-	available, err := h.catalog.IsAvailable(r.Context(), modelName)
+	available, err := h.catalog.IsAvailable(r.Context(), modelName, pkg.AudioContract)
 	if err != nil {
 		// Тритон недоступен — разрешаем только дефолтную модель, остальное отклоняем
 		if modelName != pkg.DefaultModelName {
@@ -71,7 +71,12 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создаем таску
-	if err := h.taskLoader.CreateTask(r.Context(), username, taskID, *ch, waves, modelName); err != nil {
+	payload := domain.AudioTaskPayload{
+		ModelName: modelName,
+		Chunks:    *ch,
+		Wave:      waves,
+	}
+	if err := h.taskLoader.CreateTask(r.Context(), username, taskID, payload); err != nil {
 		h.handleError(w, err)
 		return
 	}
@@ -81,13 +86,32 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
-	models, err := h.catalog.List(r.Context())
+	kind := r.URL.Query().Get("kind")
+	contract, ok := kindToContract(kind)
+	if !ok {
+		pkg.SendError(h.logger, w, fmt.Errorf("unknown model kind"), http.StatusBadRequest)
+		return
+	}
+
+	models, err := h.catalog.List(r.Context(), contract)
 	if err != nil {
 		pkg.SendError(h.logger, w, fmt.Errorf("model catalog unavailable: %w", err), http.StatusServiceUnavailable)
 		return
 	}
 
 	pkg.SendJSON(h.logger, w, models, http.StatusOK)
+}
+
+// kindToContract мапит вид задач на контракт входа модели
+func kindToContract(kind string) (pkg.InputContract, bool) {
+	switch kind {
+	case "audio":
+		return pkg.AudioContract, true
+	case "image":
+		return pkg.ImageContract, true
+	default:
+		return pkg.InputContract{}, false
+	}
 }
 
 func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {

@@ -1,33 +1,32 @@
 package modules
 
 import (
-	"audio-inference-service/internal/chunks"
 	"audio-inference-service/internal/domain"
 	"audio-inference-service/internal/modules/catalog"
+	"audio-inference-service/pkg"
 	"context"
 )
 
 // TaskManager - реализация должна уметь работать с задачами в бд, операции соответствуют методам
-type TaskManager interface {
+type TaskManager[P, R any] interface {
 	// GetTask - получить задачу: её статус и результат инференса, если он уже сохранён
-	GetTask(ctx context.Context, taskID domain.Task, username domain.Username) (*domain.TaskResult, error)
+	GetTask(ctx context.Context, taskID domain.Task, username domain.Username) (*domain.TaskResult[R], error)
 	// GetHistory - получить всю историю запросов
-	GetHistory(ctx context.Context, username domain.Username) ([]*chunks.FileInferenceResult, error)
+	GetHistory(ctx context.Context, username domain.Username) ([]*R, error)
 	// DeleteHistory - очистить всю историю запросов
 	DeleteHistory(ctx context.Context, username domain.Username) error
 
 	// CreateTask - создать задачу, то есть создать в бд строку со статусом pending
-	CreateTask(ctx context.Context, username domain.Username, taskID domain.Task,
-		chunks chunks.AudioChunks, wave []float64, modelName string) error
+	CreateTask(ctx context.Context, username domain.Username, taskID domain.Task, payload P) error
 
 	// GetAndMarkProcessing берет строки из бд, меняет в них поле статус на processing или берет строки со статусом
 	// processing если были. Они будут уже processing, если что-то упало (и не дошло до failure статуса)
-	GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload, error)
+	GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload[P], error)
 
 	// StatusSuccess и StatusFailure - cтатусы выполнения задач, успешно и с ошибкой соответственно.
 	// StatusFailure сохраняет частичный результат, если он успел собраться
-	StatusSuccess(ctx context.Context, taskID domain.Task, result *chunks.FileInferenceResult) error
-	StatusFailure(ctx context.Context, taskID domain.Task, result *chunks.FileInferenceResult) error
+	StatusSuccess(ctx context.Context, taskID domain.Task, result *R) error
+	StatusFailure(ctx context.Context, taskID domain.Task, result *R) error
 
 	// IncrementTaskError увеличивает счетчик ошибок.
 	// Если лимит исчерпан, переводит задачу в 'failure', иначе возвращает в 'pending'
@@ -35,13 +34,13 @@ type TaskManager interface {
 }
 
 // FilePredictor - реализация должна уметь брать задачу, выполнять и записывать в бд (с TaskManager работать) результат и статус
-type FilePredictor interface {
-	ProcessTask(ctx context.Context, job domain.TaskPayload) error
+type FilePredictor[P any] interface {
+	ProcessTask(ctx context.Context, job domain.TaskPayload[P]) error
 }
 
 type Catalog interface {
-	// List возвращает модели, пригодные для вызова из сервиса (контракт RAW_AUDIO)
-	List(ctx context.Context) ([]catalog.ModelInfo, error)
+	// List возвращает модели, пригодные для вызова из сервиса под конкретный контракт входа
+	List(ctx context.Context, contract pkg.InputContract) ([]catalog.ModelInfo, error)
 	// IsAvailable проверяет, что модель выбрана правильно и доступна для использования
-	IsAvailable(ctx context.Context, modelName string) (bool, error)
+	IsAvailable(ctx context.Context, modelName string, contract pkg.InputContract) (bool, error)
 }

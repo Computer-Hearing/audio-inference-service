@@ -20,7 +20,7 @@ func NewSQLiteTaskManager(db *sql.DB) *sqliteTaskManager {
 }
 
 func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
-	username domain.Username) (*domain.TaskResult, error) {
+	username domain.Username) (*domain.TaskResult[chunks.FileInferenceResult], error) {
 	if string(taskID) == "" {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -52,7 +52,7 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 		}
 	}
 
-	taskResult := &domain.TaskResult{
+	taskResult := &domain.TaskResult[chunks.FileInferenceResult]{
 		TaskID: taskID,
 		Status: pkg.TaskStatus(status),
 		Model:  model,
@@ -151,7 +151,7 @@ func (m *sqliteTaskManager) DeleteHistory(ctx context.Context, username domain.U
 
 func (m *sqliteTaskManager) CreateTask(
 	ctx context.Context, username domain.Username,
-	taskID domain.Task, audioChunks chunks.AudioChunks, wave []float64, modelName string) error {
+	taskID domain.Task, payload domain.AudioTaskPayload) error {
 	// Валидация всех полей
 	details := make(map[string]string)
 	if string(username) == "" {
@@ -160,13 +160,13 @@ func (m *sqliteTaskManager) CreateTask(
 	if string(taskID) == "" {
 		details["taskID"] = "cannot be empty"
 	}
-	if len(audioChunks.Chunks) == 0 {
+	if len(payload.Chunks.Chunks) == 0 {
 		details["chunks"] = "must contain at least one audio chunk"
 	}
-	if modelName == "" {
+	if payload.ModelName == "" {
 		details["model"] = "cannot be empty"
 	}
-	if len(wave) == 0 {
+	if len(payload.Wave) == 0 {
 		// Спектрограмму пока что пустой пропускаем, если есть, посмотрим потом.
 		// details["wave"] = "cannot be empty"
 	}
@@ -179,7 +179,7 @@ func (m *sqliteTaskManager) CreateTask(
 		}
 	}
 
-	chunksJSON, err := json.Marshal(audioChunks)
+	chunksJSON, err := json.Marshal(payload.Chunks)
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -188,7 +188,7 @@ func (m *sqliteTaskManager) CreateTask(
 		}
 	}
 
-	waveJSON, err := json.Marshal(wave)
+	waveJSON, err := json.Marshal(payload.Wave)
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -202,7 +202,7 @@ func (m *sqliteTaskManager) CreateTask(
 		VALUES (?, ?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`
 
-	_, err = m.db.ExecContext(ctx, query, taskID, username, modelName, string(chunksJSON), string(waveJSON))
+	_, err = m.db.ExecContext(ctx, query, taskID, username, payload.ModelName, string(chunksJSON), string(waveJSON))
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -214,7 +214,7 @@ func (m *sqliteTaskManager) CreateTask(
 	return nil
 }
 
-func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload, error) {
+func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload[domain.AudioTaskPayload], error) {
 	if limit <= 0 {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -249,7 +249,7 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 	}
 	defer rows.Close()
 
-	var payloads []domain.TaskPayload
+	var payloads []domain.TaskPayload[domain.AudioTaskPayload]
 	for rows.Next() {
 		var taskID, chunksJSON, model string
 
@@ -268,10 +268,12 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 			continue
 		}
 
-		payloads = append(payloads, domain.TaskPayload{
-			TaskID:    domain.Task(taskID),
-			ModelName: model,
-			Chunks:    c,
+		payloads = append(payloads, domain.TaskPayload[domain.AudioTaskPayload]{
+			TaskID: domain.Task(taskID),
+			Payload: domain.AudioTaskPayload{
+				ModelName: model,
+				Chunks:    c,
+			},
 		})
 	}
 

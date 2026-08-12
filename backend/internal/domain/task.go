@@ -20,10 +20,17 @@ func GenerateTaskID(userName string) Task {
 	return Task(fmt.Sprintf("%x", md5.Sum([]byte(userName+uuid.NewString()))))
 }
 
-type TaskPayload struct {
-	TaskID    Task
+// TaskPayload задача с типизированными данными для обработки
+type TaskPayload[P any] struct {
+	TaskID  Task
+	Payload P
+}
+
+// AudioTaskPayload данные аудио-задачи
+type AudioTaskPayload struct {
 	ModelName string
 	Chunks    chunks.AudioChunks
+	Wave      []float64
 }
 
 type TaskResponse struct {
@@ -33,9 +40,9 @@ type TaskResponse struct {
 }
 
 // TaskResult задача с её статусом и результатом инференса (если он уже сохранён)
-type TaskResult struct {
-	TaskID Task                        `json:"task_id"`
-	Status pkg.TaskStatus              `json:"status"`
-	Model  string                      `json:"model,omitempty"`
-	Result *chunks.FileInferenceResult `json:"result,omitempty"`
+type TaskResult[R any] struct {
+	TaskID Task           `json:"task_id"`
+	Status pkg.TaskStatus `json:"status"`
+	Model  string         `json:"model,omitempty"`
+	Result *R             `json:"result,omitempty"`
 }

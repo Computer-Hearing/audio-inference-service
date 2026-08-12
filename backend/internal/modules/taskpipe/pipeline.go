@@ -10,9 +10,9 @@ import (
 
 // StartPipeline - отвечает за запуск верокеров, которые задачи выполняют, а также диспетчера, который данные из бд берет
 // связываются через канал.
-func StartPipeline(ctx context.Context, manager modules.TaskManager, predictor modules.FilePredictor) {
+func StartPipeline[P, R any](ctx context.Context, manager modules.TaskManager[P, R], predictor modules.FilePredictor[P]) {
 	// Канал, через который Диспетчер передает задачи Воркерам
-	jobsChan := make(chan domain.TaskPayload, 20)
+	jobsChan := make(chan domain.TaskPayload[P], 20)
 
 	// Запускаем, например, 5 воркеров (горутин)
 	for i := 0; i < 5; i++ {

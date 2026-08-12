@@ -16,17 +16,17 @@ import (
 
 type Predictor struct {
 	TritonConnector *triton.TritonClient
-	TaskManager     modules.TaskManager
+	TaskManager     modules.TaskManager[domain.AudioTaskPayload, chunks.FileInferenceResult]
 }
 
-func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) error {
-	modelName := job.ModelName
+func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload[domain.AudioTaskPayload]) error {
+	modelName := job.Payload.ModelName
 	if modelName == "" {
 		modelName = pkg.DefaultModelName
 	}
 
 	// База данных свободна, пока мы делаем долгий сетевой запрос к Тритону
-	result, inferErr := processAudioChunks(ctx, p.TritonConnector, modelName, job.Chunks)
+	result, inferErr := processAudioChunks(ctx, p.TritonConnector, modelName, job.Payload.Chunks)
 
 	// Обновляем статус в БД короткими транзакциями
 	err := pkg.RetryDo(ctx, nil, func(ctx context.Context) error {

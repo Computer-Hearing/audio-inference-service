@@ -15,6 +15,18 @@ import (
 
 type TaskStatus string
 
+// InputContract требования к входному тензору модели для конкретного вида задач
+type InputContract struct {
+	InputName     string
+	InputDatatype string
+}
+
+// Контракты входа по видам задач
+var (
+	AudioContract = InputContract{InputName: RawAudioInputName, InputDatatype: RawAudioInputDatatype}
+	ImageContract = InputContract{InputName: RawImageInputName, InputDatatype: RawAudioInputDatatype}
+)
+
 const (
 	// User-defined
 	UsernameCookieKey = "username"
@@ -34,6 +46,7 @@ const (
 	DefaultModelName      = "cnn_predict_pipline"
 	RawAudioInputName     = "RAW_AUDIO"
 	RawAudioInputDatatype = "TYPE_UINT8"
+	RawImageInputName     = "RAW_IMAGE"
 	MaxTritonConcurrency  = 8
 
 	UsernameFirstMin     = 4
