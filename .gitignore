@@ -2,3 +2,7 @@
 .bin/
 *.log
 .env
+*.db
+*.db-shm
+*.db-wal
+*.txt

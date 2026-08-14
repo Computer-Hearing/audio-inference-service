@@ -5,7 +5,7 @@ services:
     container_name: triton
     build:
       context: .
-      dockerfile: dockerfiles/Dockerfile.triton
+      dockerfile: dockerfiles/Triton.Dockerfile
     ports:
       - 8000:8000 # HTTP endpoints for inference
       - 8001:8001 # GRPS endpoints for inference
@@ -21,38 +21,38 @@ services:
             - capabilities: [ gpu ]
               count: 1
 
-  postgres:
-    container_name: postgres
-    image: postgres:17-alpine
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
   backend:
     container_name: backend
     build:
       context: ../backend
-      dockerfile: dockerfiles/Dockerfile.backend
-    restart: always
-    depends_on:
-      - postgres
-
-  caddy:
-    container_name: caddy
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile.caddy
+      dockerfile: ../deployments/dockerfiles/Backend.Dockerfile
     ports:
-      - 80:80
+      - 6767:6767
+    environment:
+      ENV: ${ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      HTTP_ADDR: ${HTTP_ADDR:-:6767}
+      DB_PATH: ${DB_PATH:-sqlite.db}
+      TRITON_ADDR: ${TRITON_ADDR:-triton:8001}
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - backend_data:/app
     restart: always
     depends_on:
-      - backend
+      - triton
+
+  # caddy:
+  #   container_name: caddy
+  #   build:
+  #     context: .
+  #     dockerfile: dockerfiles/Caddy.Dockerfile
+  #   ports:
+  #     - 80:80
+  #   volumes:
+  #     - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+  #   restart: always
+  #   depends_on:
+  #     - backend
 
 volumes:
   postgres_data:
+  backend_data:
