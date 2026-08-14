@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const CATEGORY = { 0: 'car', 1: 'emv', 2: 'motorcycle', 3: 'tram', 4: 'truck' };
 const TARGET = {
@@ -8,7 +8,17 @@ const TARGET = {
 
 export default function Spectrogram({ spectrogram, chunks, duration, currentTime }) {
   const canvasRef = useRef(null);
+  const [visibleLayers, setVisibleLayers] = useState(new Set([0, 1]));
 
+  // группируем чанки по слоям
+  const layersMap = {};
+  (chunks || []).forEach((ch) => {
+    const l = ch.layer ?? 0;
+    (layersMap[l] = layersMap[l] || []).push(ch);
+  });
+  const layerIds = Object.keys(layersMap).map(Number).sort((a, b) => a - b);
+
+  // ---- отрисовка столбиков спектрограммы ----
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv || !spectrogram || !spectrogram.length) return;
@@ -35,6 +45,7 @@ export default function Spectrogram({ spectrogram, chunks, duration, currentTime
       ctx.fillRect(i * barW, H - h, Math.max(1, barW - 1), h);
     }
 
+    // жёлтая линия — текущее время
     if (duration > 0) {
       const x = (currentTime / duration) * W;
       ctx.strokeStyle = '#ffcc66';
@@ -46,7 +57,19 @@ export default function Spectrogram({ spectrogram, chunks, duration, currentTime
     }
   }, [spectrogram, currentTime, duration]);
 
-  const totalChunks = chunks ? chunks.length : 0;
+  const toggleLayer = (l) => {
+    setVisibleLayers((prev) => {
+      const next = new Set(prev);
+      if (next.has(l)) next.delete(l);
+      else next.add(l);
+      return next;
+    });
+  };
+
+  // базовый слой (layer 0) для расчёта позиций
+  const baseLayer = layersMap[0] || [];
+  const baseCount = baseLayer.length;
+  const chunkSec = duration > 0 && baseCount > 0 ? duration / baseCount : 2;
 
   return (
     <div className="card">
@@ -55,32 +78,88 @@ export default function Spectrogram({ spectrogram, chunks, duration, currentTime
         ref={canvasRef}
         style={{ width: '100%', height: 160, display: 'block', marginTop: 8 }}
       />
-      {totalChunks > 0 && (
-        <div style={{ display: 'flex', marginTop: 8 }}>
-          {chunks.map((ch, i) => {
-            const catIdx = ch.category.indexOf(Math.max(...ch.category));
-            const tgtIdx = ch.target.indexOf(Math.max(...ch.target));
-            const isActive =
-              duration > 0 &&
-              (i / totalChunks) * duration <= currentTime &&
-              ((i + 1) / totalChunks) * duration > currentTime;
+
+      {/* переключатели слоёв */}
+      {layerIds.length > 1 && (
+        <div className="row" style={{ marginTop: 8 }}>
+          <span className="muted">Слои:</span>
+          {layerIds.map((l) => {
+            const offset = (layersMap[l]?.[0]?.offset ?? 0);
             return (
-              <div
-                key={ch.chunk_index || i}
-                style={{
-                  flex: 1,
-                  background: isActive ? '#2a3a46' : '#18212a',
-                  border: '1px solid #2e3a44',
-                  padding: '6px 4px',
-                  fontSize: 11,
-                  color: isActive ? '#ffcc66' : '#d5dde4',
-                  overflow: 'hidden',
-                  opacity: ch.error ? 0.5 : 1,
-                }}
+              <button
+                key={l}
+                onClick={() => toggleLayer(l)}
+                style={
+                  visibleLayers.has(l)
+                    ? { background: '#2a3a46', color: '#ffcc66' }
+                    : { opacity: 0.5 }
+                }
               >
-                <div>{CATEGORY[catIdx] || '?'}</div>
-                <div>{TARGET[tgtIdx] || '?'}</div>
-                {ch.error && <div style={{ color: '#f5785a', fontSize: 9 }}>err</div>}
+                {l} (offset {offset}s)
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* пирамида слоёв: сверху вниз (layer N, N-1, ..., 0) */}
+      {layerIds.length > 0 && baseCount > 0 && (
+        <div style={{ marginTop: 12 }}>
+          {[...layerIds].reverse().map((layerId) => {
+            if (!visibleLayers.has(layerId)) return null;
+            const layerChunks = layersMap[layerId] || [];
+            const offset = layerChunks[0]?.offset ?? 0;
+
+            return (
+              <div key={layerId} style={{ position: 'relative', height: 56, marginBottom: 4 }}>
+                <div
+                  className="muted"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    fontSize: 10,
+                    color: '#7a8a99',
+                  }}
+                >
+                  L{layerId}
+                </div>
+                {layerChunks.map((ch, i) => {
+                  const startSec = offset + ch.chunk_index * chunkSec;
+                  const endSec = startSec + chunkSec;
+                  const isActive =
+                    chunkSec > 0 && currentTime >= startSec && currentTime < endSec;
+
+                  const left = (startSec / duration) * 100;
+                  const width = (chunkSec / duration) * 100;
+
+                  const catIdx = ch.category.indexOf(Math.max(...ch.category));
+                  const tgtIdx = ch.target.indexOf(Math.max(...ch.target));
+
+                  return (
+                    <div
+                      key={`${layerId}-${ch.chunk_index}-${i}`}
+                      style={{
+                        position: 'absolute',
+                        top: 16,
+                        bottom: 0,
+                        left: `${left}%`,
+                        width: `calc(${width}% - 2px)`,
+                        background: isActive ? '#2a3a46' : '#18212a',
+                        border: '1px solid #2e3a44',
+                        padding: '4px 4px',
+                        fontSize: 10,
+                        color: isActive ? '#ffcc66' : '#d5dde4',
+                        overflow: 'hidden',
+                        opacity: ch.error ? 0.5 : 1,
+                      }}
+                    >
+                      <div>{CATEGORY[catIdx] || '?'}</div>
+                      <div>{TARGET[tgtIdx] || '?'}</div>
+                      {ch.error && <div style={{ color: '#f5785a', fontSize: 8 }}>err</div>}
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
