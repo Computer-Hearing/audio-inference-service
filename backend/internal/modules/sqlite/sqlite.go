@@ -160,7 +160,7 @@ func (m *sqliteTaskManager) CreateTask(
 	if string(taskID) == "" {
 		details["taskID"] = "cannot be empty"
 	}
-	if len(payload.Chunks.Chunks) == 0 {
+	if len(payload.Chunks.Layers) == 0 {
 		details["chunks"] = "must contain at least one audio chunk"
 	}
 	if payload.ModelName == "" {

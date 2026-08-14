@@ -56,6 +56,9 @@ const (
 	UsernameDelimiterLen = 1
 )
 
+// ChunkOffsetsSeconds сдвиги нарезки аудио в секундах для слоёв сегментации
+var ChunkOffsetsSeconds = []int{0, 1}
+
 func GetLoglevel(level string) slog.Level {
 	switch level {
 	case "debug":

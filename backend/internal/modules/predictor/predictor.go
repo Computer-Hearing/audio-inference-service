@@ -53,18 +53,27 @@ func processAudioChunks(
 	modelName string,
 	audio chunks.AudioChunks) (*chunks.FileInferenceResult, error) {
 
-	results := make([]chunks.ChunkResult, len(audio.Chunks))
+	total := 0
+	for _, layer := range audio.Layers {
+		total += len(layer.Chunks)
+	}
+
+	results := make([]chunks.ChunkResult, total)
 	g, ctx := errgroup.WithContext(ctx)
 	sem := make(chan struct{}, pkg.MaxTritonConcurrency)
 
-	for i, chunk := range audio.Chunks {
-		i, chunk := i, chunk
-		sem <- struct{}{}
-		g.Go(func() error {
-			defer func() { <-sem }()
-			results[i] = processChunk(ctx, client, modelName, i, chunk)
-			return nil // ошибки чанка не пробрасываем наверх, они уже в results[i].Err
-		})
+	next := 0
+	for li, layer := range audio.Layers {
+		for ci, chunk := range layer.Chunks {
+			cur := next
+			next++
+			sem <- struct{}{}
+			g.Go(func() error {
+				defer func() { <-sem }()
+				results[cur] = processChunk(ctx, client, modelName, layer.Offset, li, ci, chunk)
+				return nil // ошибки чанка не пробрасываем наверх, они уже в results[cur].Err
+			})
+		}
 	}
 
 	if err := g.Wait(); err != nil {
@@ -79,11 +88,13 @@ func processAudioChunks(
 }
 
 // processChunk отправляет один чанк в Triton
-func processChunk(ctx context.Context, client *triton.TritonClient, modelName string, index int, chunk []byte) chunks.ChunkResult {
+func processChunk(ctx context.Context, client *triton.TritonClient, modelName string, offset, layer, index int, chunk []byte) chunks.ChunkResult {
 	result, err := runRawAudioInference(ctx, client, modelName, chunk)
 	if err != nil {
 		return chunks.ChunkResult{
 			ChunkIndex:   index,
+			Layer:        layer,
+			Offset:       offset,
 			Err:          fmt.Errorf("inference failed: %w", err),
 			ErrorMessage: err.Error(),
 		}
@@ -91,6 +102,8 @@ func processChunk(ctx context.Context, client *triton.TritonClient, modelName st
 
 	return chunks.ChunkResult{
 		ChunkIndex: index,
+		Layer:      layer,
+		Offset:     offset,
 		Category:   result.CategoryLogits,
 		Target:     result.TargetLogits,
 	}
