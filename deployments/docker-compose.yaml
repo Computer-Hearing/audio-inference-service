@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  triton:
+    container_name: triton
+    build:
+      context: .
+      dockerfile: dockerfiles/Triton.Dockerfile
+    ports:
+      - 8000:8000 # HTTP endpoints for inference
+      - 8001:8001 # GRPS endpoints for inference
+      - 8002:8002 # Metrics endpoints for Prometheus
+    restart: always
+    volumes:
+      - ../triton/models:/models
+    command: ["tritonserver", "--model-store=/models"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+              count: 1
+
+  backend:
+    container_name: backend
+    build:
+      context: ../backend
+      dockerfile: ../deployments/dockerfiles/Backend.Dockerfile
+    ports:
+      - 6767:6767
+    environment:
+      ENV: ${ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      HTTP_ADDR: ${HTTP_ADDR:-:6767}
+      DB_PATH: ${DB_PATH:-sqlite.db}
+      TRITON_ADDR: ${TRITON_ADDR:-triton:8001}
+    volumes:
+      - backend_data:/app
+    restart: always
+    depends_on:
+      - triton
+
+  caddy:
+    container_name: caddy
+    build:
+      context: ..
+      dockerfile: deployments/dockerfiles/Caddy.Dockerfile
+    ports:
+      - 80:80
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: always
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:
