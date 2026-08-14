@@ -40,19 +40,18 @@ services:
     depends_on:
       - triton
 
-  # caddy:
-  #   container_name: caddy
-  #   build:
-  #     context: .
-  #     dockerfile: dockerfiles/Caddy.Dockerfile
-  #   ports:
-  #     - 80:80
-  #   volumes:
-  #     - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-  #   restart: always
-  #   depends_on:
-  #     - backend
+  caddy:
+    container_name: caddy
+    build:
+      context: ..
+      dockerfile: deployments/dockerfiles/Caddy.Dockerfile
+    ports:
+      - 80:80
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: always
+    depends_on:
+      - backend
 
 volumes:
-  postgres_data:
   backend_data:

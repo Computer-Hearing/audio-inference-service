@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://192.168.3.160:6767', // адрес бэкенда в сети
+        target: 'http://localhost:80', // caddy проксирует /api в backend:6767
         changeOrigin: true,
       },
     },

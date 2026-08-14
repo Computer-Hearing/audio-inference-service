@@ -1,20 +1,9 @@
 :80 {
-    rate_limit {
-        zone per_second {
-            key {remote_host}
-            events 10
-            window 1s
-        }
-        zone per_minute {
-            key {remote_host}
-            events 60
-            window 1m
-        }
-    }
+    root * /srv
+    try_files {path} /index.html
+    file_server
 
-    reverse_proxy backend:6767
-
-    header {
-        Content-Security-Policy "upgrade-insecure-requests"
+    handle /api/* {
+        reverse_proxy backend:6767
     }
 }

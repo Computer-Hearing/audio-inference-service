@@ -7,3 +7,4 @@
 *.db-wal
 *.txt
 node_modules/
+frontend/dist/
