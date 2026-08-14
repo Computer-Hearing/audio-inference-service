@@ -31,7 +31,7 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 
 	var (
 		status     string
-		resultJSON string
+		resultJSON sql.NullString
 		model      string
 	)
 	query := `SELECT status, result, model FROM tasks WHERE username = ? and id = ?`
@@ -58,9 +58,9 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 		Model:  model,
 	}
 
-	if resultJSON != "" {
+	if resultJSON.Valid && resultJSON.String != "" {
 		var res chunks.FileInferenceResult
-		if err := json.Unmarshal([]byte(resultJSON), &res); err != nil {
+		if err := json.Unmarshal([]byte(resultJSON.String), &res); err != nil {
 			return nil, pkg.APIError{
 				StatusCode: http.StatusInternalServerError,
 				Message:    "Failed to unmarshal task result",
