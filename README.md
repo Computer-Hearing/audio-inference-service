@@ -43,18 +43,3 @@ Multi-task классификация звуков дорожного трафи
 
 Инференс построен на **NVIDIA Triton Inference Server** + API на golang.
 
-...
-
-```bash
-# Запуск Triton
-docker-compose up -d
-
-# Отправка запроса (пример)
-curl -X POST http://localhost:8000/v2/models/audio_classifier/infer
-```
-
-## Запуск проекта
-```bash
-git clone ...
-docker-compose up -d
-```
