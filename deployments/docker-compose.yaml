@@ -1,8 +1,16 @@
 version: '3.8'
 
+networks:
+  inference-net:
+    driver: bridge
+  tool-net:
+    external: true
+
 services:
   triton:
-    container_name: triton
+    networks:
+      - inference-net
+    container_name: inference_triton
     build:
       context: .
       dockerfile: dockerfiles/Triton.Dockerfile
@@ -22,7 +30,9 @@ services:
               count: 1
 
   backend:
-    container_name: backend
+    networks:
+      - inference-net
+    container_name: inference_backend
     build:
       context: ../backend
       dockerfile: ../deployments/dockerfiles/Backend.Dockerfile
@@ -41,7 +51,10 @@ services:
       - triton
 
   caddy:
-    container_name: caddy
+    networks:
+      - inference-net
+      - tool-net
+    container_name: inference_caddy
     build:
       context: ..
       dockerfile: deployments/dockerfiles/Caddy.Dockerfile

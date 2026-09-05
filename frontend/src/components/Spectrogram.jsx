@@ -133,8 +133,8 @@ export default function Spectrogram({ spectrogram, chunks, duration, currentTime
                   const left = (startSec / duration) * 100;
                   const width = (chunkSec / duration) * 100;
 
-                  const catIdx = ch.category.indexOf(Math.max(...ch.category));
-                  const tgtIdx = ch.target.indexOf(Math.max(...ch.target));
+                  const catIdx = ch.category?.indexOf(Math.max(...ch.category)) ?? -1;
+                  const tgtIdx = ch.target?.indexOf(Math.max(...ch.target)) ?? -1;
 
                   return (
                     <div
