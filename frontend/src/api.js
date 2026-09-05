@@ -1,3 +1,5 @@
+const API_PREFIX = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 function safeParse(text) {
   try {
     return JSON.parse(text);
@@ -7,7 +9,7 @@ function safeParse(text) {
 }
 
 export async function register(name) {
-  const res = await fetch('/api/v1/register', {
+  const res = await fetch(`${API_PREFIX}/api/v1/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -28,7 +30,7 @@ export async function register(name) {
 }
 
 export async function getModels() {
-  const res = await fetch('/api/v1/models', {
+  const res = await fetch(`${API_PREFIX}/api/v1/models`, {
     credentials: 'include',
   });
 
@@ -50,7 +52,7 @@ export async function createTask(file, model, onRaw) {
     headers['X-Model'] = model;
   }
 
-  const res = await fetch('/api/v1/tasks', {
+  const res = await fetch(`${API_PREFIX}/api/v1/tasks`, {
     method: 'POST',
     credentials: 'include',
     headers: headers,
@@ -60,7 +62,7 @@ export async function createTask(file, model, onRaw) {
   const bodyText = await res.text();
   const body = safeParse(bodyText);
   console.log('[createTask]', res.status, body);
-  if (onRaw) onRaw({ url: 'POST /api/v1/tasks', status: res.status, body });
+  if (onRaw) onRaw({ url: `POST ${API_PREFIX}/api/v1/tasks`, status: res.status, body });
 
   if (!res.ok) {
     throw new Error(body?.message || 'createTask failed: ' + res.status);
@@ -75,14 +77,14 @@ export async function pollTask(taskId, onRaw) {
   let lastErrorText = '';
 
   while (true) {
-    const res = await fetch(`/api/v1/tasks/${taskId}`, {
+    const res = await fetch(`${API_PREFIX}/api/v1/tasks/${taskId}`, {
       credentials: 'include',
     });
 
     const bodyText = await res.text();
     const body = safeParse(bodyText);
     console.log('[pollTask]', res.status, body);
-    if (onRaw) onRaw({ url: `GET /api/v1/tasks/${taskId}`, status: res.status, body });
+    if (onRaw) onRaw({ url: `GET ${API_PREFIX}/api/v1/tasks/${taskId}`, status: res.status, body });
 
     if (res.ok) {
       if (body.status === 'success') return body;
@@ -109,7 +111,7 @@ export async function pollTask(taskId, onRaw) {
 }
 
 export async function getHistory() {
-  const res = await fetch('/api/v1/tasks/history', {
+  const res = await fetch(`${API_PREFIX}/api/v1/tasks/history`, {
     credentials: 'include',
   });
   if (!res.ok) throw new Error('getHistory failed: ' + res.status);
@@ -117,7 +119,7 @@ export async function getHistory() {
 }
 
 export async function clearHistory() {
-  const res = await fetch('/api/v1/tasks/history', {
+  const res = await fetch(`${API_PREFIX}/api/v1/tasks/history`, {
     method: 'DELETE',
     credentials: 'include',
   });
