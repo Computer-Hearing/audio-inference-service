@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/tritonserver:24.09-py3
+FROM w0dr/tritonserver:24.09-py3
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
