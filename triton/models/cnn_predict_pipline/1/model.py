@@ -1,10 +1,8 @@
 import triton_python_backend_utils as pb_utils
 import numpy as np
-import torch
-import torchaudio
+import librosa
 import io
 import json
-torchaudio.set_audio_backend("soundfile")
 
 
 class TritonPythonModel:
@@ -21,45 +19,37 @@ class TritonPythonModel:
         self.f_max = 16384
         self.target_width = 173
 
-        # Трансформации на GPU если есть
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.mel_transform = torchaudio.transforms.MelSpectrogram(
-            sample_rate=self.sample_rate,
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            n_mels=self.n_mels,
-            f_max=self.f_max,
-        ).to(self.device)
-        self.db_transform = torchaudio.transforms.AmplitudeToDB(
-            top_db=80.0
-        ).to(self.device)
-
-        # Кэш для ресемплеров
-        self.resamplers = {}
-        # Для моно
-        self.downmix = torchaudio.transforms.DownmixMono()
-
-        print(f"Model initialized on {self.device} with torchaudio")
-        print(f"Available backends: {torchaudio.list_audio_backends()}")
+        print(f"Model initialized with librosa")
 
     def _load_audio(self, audio_bytes):
-        """Загружает аудио из байтов и приводит к нужному формату"""
+        """Загружает аудио из байтов и приводит к нужному формату с помощью librosa"""
         try:
-            waveform, orig_sr = torchaudio.load(io.BytesIO(audio_bytes))
+            # Загружаем аудио из байтов в память
+            audio_data, orig_sr = librosa.load(io.BytesIO(audio_bytes), sr=None, mono=True)
         except Exception as e:
             raise RuntimeError(f"Failed to load audio: {e}")
 
-        # Ресемплинг при необходимости
+        # Ресемплинг при необходимости (librosa делает это автоматически, если указать sr)
         if orig_sr != self.sample_rate:
-            if orig_sr not in self.resamplers:
-                self.resamplers[orig_sr] = torchaudio.transforms.Resample(orig_sr, self.sample_rate)
-            waveform = self.resamplers[orig_sr](waveform)
+            audio_data = librosa.resample(audio_data, orig_sr=orig_sr, target_sr=self.sample_rate)
 
-        # Приводим к моно
-        if waveform.shape[0] > 1:
-            waveform = self.downmix(waveform)
+        return audio_data.astype(np.float32)
 
-        return waveform.squeeze(0).float()
+    def _audio_to_mel(self, audio):
+        """Преобразует аудио-сигнал в мел-спектрограмму с помощью librosa"""
+        # Строим мел-спектрограмму
+        mel_spec = librosa.feature.melspectrogram(
+            y=audio,
+            sr=self.sample_rate,
+            n_mels=self.n_mels,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            fmax=self.f_max,
+            power=2.0
+        )
+        # Переводим в децибелы
+        mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max, top_db=80.0)
+        return mel_spec_db
 
     def execute(self, requests):
         all_audio_bytes = []
@@ -77,45 +67,32 @@ class TritonPythonModel:
         if total_batch == 0:
             return [pb_utils.InferenceResponse() for _ in requests]
 
-        # Загрузка всех аудио
-        audio_tensors_cpu = []
+        # Загрузка всех аудио и преобразование в спектрограммы
+        processed = []
         for audio_bytes in all_audio_bytes:
             try:
-                audio_tensors_cpu.append(self._load_audio(audio_bytes))
+                # Загружаем и ресемплим
+                audio = self._load_audio(audio_bytes)
+                # Строим мел-спектрограмму
+                mel_spec = self._audio_to_mel(audio)
+
+                # Обрезка/дополнение до target_width
+                if mel_spec.shape[1] > self.target_width:
+                    mel_spec = mel_spec[:, :self.target_width]
+                elif mel_spec.shape[1] < self.target_width:
+                    pad_width = self.target_width - mel_spec.shape[1]
+                    mel_spec = np.pad(mel_spec, ((0, 0), (0, pad_width)), mode='constant')
+
+                # Нормализация
+                mel_spec = (mel_spec - self.mel_mean) / (self.mel_std + 1e-8)
+                # Добавляем канальное измерение (batch_size, channels, height, width)
+                mel_spec = np.expand_dims(mel_spec, axis=0).astype(np.float32)
+                processed.append(mel_spec)
+
             except Exception as e:
-                error_msg = f"Audio loading failed: {e}"
+                error_msg = f"Audio processing failed: {e}"
                 return [pb_utils.InferenceResponse(error=pb_utils.TritonError(error_msg))
                         for _ in requests]
-
-        # Паддинг до максимальной длины
-        max_len = max(t.shape[0] for t in audio_tensors_cpu)
-        padded_batch = torch.stack([
-            torch.nn.functional.pad(t, (0, max_len - t.shape[0]))
-            for t in audio_tensors_cpu
-        ], dim=0)
-
-        # Вычисление спектрограмм на GPU
-        audio_batch_gpu = padded_batch.to(self.device)
-        mel_spec_batch = self.mel_transform(audio_batch_gpu)
-        mel_spec_db_batch = self.db_transform(mel_spec_batch)
-
-        # Обработка каждой спектрограммы
-        mel_spec_db_np = mel_spec_db_batch.cpu().numpy()
-        processed = []
-        for i in range(mel_spec_db_np.shape[0]):
-            spec = mel_spec_db_np[i]
-
-            # Обрезка/дополнение
-            if spec.shape[1] > self.target_width:
-                spec = spec[:, :self.target_width]
-            elif spec.shape[1] < self.target_width:
-                pad = self.target_width - spec.shape[1]
-                spec = np.pad(spec, ((0, 0), (0, pad)), mode='constant')
-
-            # Нормализация
-            spec = (spec - self.mel_mean) / (self.mel_std + 1e-8)
-            spec = np.expand_dims(spec, axis=0).astype(np.float32)
-            processed.append(spec)
 
         batch_input = np.stack(processed, axis=0)
 
