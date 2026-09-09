@@ -66,7 +66,7 @@ func main() {
 	handlers := handlers.New(taskManager, logger, modelCatalog)
 	srv := &http.Server{
 		Addr:         cfg.HTTPAddr,
-		Handler:      router.New(logger, handlers),
+		Handler:      router.New(logger, handlers, cfg.APIPrefix),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 5 * time.Minute,
 	}
