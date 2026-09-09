@@ -10,10 +10,8 @@ services:
   triton:
     networks:
       - inference-net
+    image: w0dr/tritonserver:24.09-py3
     container_name: inference_triton
-    build:
-      context: .
-      dockerfile: dockerfiles/Triton.Dockerfile
     ports:
       - 8000:8000 # HTTP endpoints for inference
       - 8001:8001 # GRPS endpoints for inference
@@ -21,7 +19,16 @@ services:
     restart: always
     volumes:
       - ../triton/models:/models
-    command: ["tritonserver", "--model-store=/models"]
+
+    command: >
+      bash -c "
+        apt-get update && apt-get install -y ffmpeg libsndfile1 && rm -rf /var/lib/apt/lists/* &&
+        pip install librosa numpy scipy soundfile torch torchaudio &&
+        tritonserver --model-repository=/models
+      "
+
+    #command: ["tritonserver", "--model-store=/models"]
+
     deploy:
       resources:
         reservations:
