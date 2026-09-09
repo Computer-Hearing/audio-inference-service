@@ -10,4 +10,5 @@ RUN pip install --no-cache-dir \
     numpy \
     scipy \
     soundfile \
+    torch \
     torchaudio
