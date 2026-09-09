@@ -12,7 +12,7 @@ class TritonPythonModel:
         self.mel_mean = -41.9199
         self.mel_std = 17.9253
         # Параметры Mel-спектрограммы
-        self.sample_rate = 44000
+        self.sample_rate = 44100
         self.n_mels = 256
         self.n_fft = 2048
         self.hop_length = 512
