@@ -9,6 +9,4 @@ RUN pip install --no-cache-dir \
     librosa \
     numpy \
     scipy \
-    soundfile \
-    torch \
-    torchaudio
+    soundfile
