@@ -1,12 +1,13 @@
 name: "cnn_predict_pipline"
 backend: "python"
-max_batch_size: 0
+max_batch_size: 8
 
 input [
   {
     name: "RAW_AUDIO"
     data_type: TYPE_UINT8
     dims: [ -1 ]
+    allow_ragged_batch: true
   }
 ]
 
@@ -14,11 +15,11 @@ output [
   {
     name: "category_output"
     data_type: TYPE_FP32
-    dims: [ 1, 5 ]
+    dims: [ 5 ]
   },
   {
     name: "target_output"
     data_type: TYPE_FP32
-    dims: [ 1, 7 ]
+    dims: [ 7 ]
   }
 ]
