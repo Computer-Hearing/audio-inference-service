@@ -14,6 +14,7 @@ type Config struct {
 	HTTPAddr   string `env:"HTTP_ADDR" envDefault:":6767" validate:"required"`
 	DBPath     string `env:"DB_PATH" envDefault:"./sqlite.db" validate:"required"`
 	TritonAddr string `env:"TRITON_ADDR" envDefault:"triton:8001" validate:"required"`
+	APIPrefix  string `env:"API_PREFIX" envDefault:"/"`
 }
 
 // Load читает переменные окружения и валидирует конфигурацию
