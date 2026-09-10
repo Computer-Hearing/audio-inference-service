@@ -122,7 +122,7 @@ func runRawAudioInference(
 			{
 				Name:     pkg.RawAudioInputName,
 				Datatype: "UINT8",
-				Shape:    []int64{int64(len(chunk))}, // max_batch_size:0 → без добавления батча
+				Shape:    []int64{1, int64(len(chunk))}, // max_batch_size:0 → без добавления батча
 			},
 		},
 		Outputs: []*gen.ModelInferRequest_InferRequestedOutputTensor{
