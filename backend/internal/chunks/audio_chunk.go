@@ -87,6 +87,14 @@ func splitAudio(file multipart.File, header *multipart.FileHeader, chunkSeconds 
 			return nil, err
 		}
 
+		if offset == 0 {
+			fullChunks := int(duration) / chunkSeconds
+			tail := duration - float64(fullChunks*chunkSeconds)
+			if fullChunks > 0 && len(matches) > fullChunks && tail < pkg.MinTailChunkSeconds {
+				matches = matches[:fullChunks]
+			}
+		}
+
 		// перебираем чанки, открываем и добавляем в слайсик
 		chunks := make([][]byte, 0, len(matches))
 		for _, m := range matches {
@@ -120,10 +128,13 @@ func segmentLayer(inputPath, layerDir, ext string, offset, chunkSeconds int, tri
 
 	args := []string{}
 	if offset > 0 {
+		// флаг -ss говорит ffmpeg начинать обработку вот с такого-то момента времени
 		args = append(args, "-ss", strconv.Itoa(offset))
 	}
+	// -i флаг ищущий сам файл
 	args = append(args, "-i", inputPath)
 	if trim > 0 {
+		// -to флаг до какого момента времени резать звук
 		args = append(args, "-to", strconv.FormatFloat(trim, 'f', -1, 64))
 	}
 	args = append(args,
@@ -137,7 +148,6 @@ func segmentLayer(inputPath, layerDir, ext string, offset, chunkSeconds int, tri
 	// Берем тулзу cmd
 	cmd := exec.Command("ffmpeg", args...)
 
-	// Буфер ошибок передаем, это ж из cmd, а не го вызов
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	// выполняем

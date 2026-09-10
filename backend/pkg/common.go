@@ -38,6 +38,7 @@ const (
 
 	// Validate Chunks
 	SecondsPerAudioChunk = 2
+	MinTailChunkSeconds  = 0.5
 	AudioWaveBucketsLen  = 40
 
 	// Triton

@@ -15,9 +15,8 @@ func New(logger *slog.Logger, h *handlers.Handlers, apiPrefix string) http.Handl
 	if h == nil {
 		panic("handler is nil")
 	}
-	if apiPrefix == "/" {
-		apiPrefix = ""
-	}
+
+	apiPrefix = fixApiPrefix(apiPrefix)
 
 	mux := http.NewServeMux()
 
@@ -37,4 +36,20 @@ func New(logger *slog.Logger, h *handlers.Handlers, apiPrefix string) http.Handl
 	return middleware.Recovery(logger)(
 		middleware.Logging(logger)(mux),
 	)
+}
+
+func fixApiPrefix(apiPrefix string) string {
+	fixedApiPrefix := apiPrefix
+
+	if apiPrefix == "/" {
+		return ""
+	}
+	if len(apiPrefix) > 0 && apiPrefix[0] != '/' {
+		fixedApiPrefix = "/" + fixedApiPrefix
+	}
+	if len(apiPrefix) > 0 && apiPrefix[len(apiPrefix)-1] == '/' {
+		fixedApiPrefix = fixedApiPrefix[:len(fixedApiPrefix)-1]
+	}
+
+	return fixedApiPrefix
 }
