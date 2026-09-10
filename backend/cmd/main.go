@@ -12,6 +12,7 @@ import (
 	"audio-inference-service/pkg"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -27,7 +28,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: pkg.GetLoglevel(cfg.LogLevel), AddSource: true}))
+	logger := slog.New(slog.NewTextHandler(os.Stdout,
+		&slog.HandlerOptions{Level: pkg.GetLoglevel(cfg.LogLevel), AddSource: pkg.GetLoglevel(cfg.LogLevel) == slog.LevelDebug}))
 	slog.SetDefault(logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -87,4 +89,21 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown failed", "err", err.Error())
 	}
+}
+
+func printConfig(cfg *config.Config) {
+	if cfg == nil {
+		fmt.Println("config is nil")
+		return
+	}
+
+	logger := slog.Default()
+
+	logger.Debug("config",
+		slog.String("ENV", cfg.Env),
+		slog.String("LogLevel", cfg.LogLevel),
+		slog.String("HTTP_ADDR", cfg.HTTPAddr),
+		slog.String("DB_PATH", cfg.DBPath),
+		slog.String("TRITON_ADDR", cfg.TritonAddr),
+		slog.String("API_PREFIX", cfg.APIPrefix))
 }

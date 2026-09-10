@@ -10,7 +10,7 @@ import (
 // Config собирает настройки сервиса из переменных окружения
 type Config struct {
 	Env        string `env:"ENV" envDefault:"development" validate:"omitempty,oneof=development production"`
-	LogLevel   string `env:"LOG_LEVEL" envDefault:"info" validate:"omitempty,oneof=debug info warn error"`
+	LogLevel   string `env:"LOG_LEVEL" envDefault:"debug" validate:"omitempty,oneof=debug info warn error"`
 	HTTPAddr   string `env:"HTTP_ADDR" envDefault:":6767" validate:"required"`
 	DBPath     string `env:"DB_PATH" envDefault:"./sqlite.db" validate:"required"`
 	TritonAddr string `env:"TRITON_ADDR" envDefault:"triton:8001" validate:"required"`
