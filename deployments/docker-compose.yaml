@@ -22,12 +22,6 @@ services:
     volumes:
       - ../triton/models:/models
     command: ["tritonserver", "--model-store=/models"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
-              count: 1
 
   backend:
     networks:

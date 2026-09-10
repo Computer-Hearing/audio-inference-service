@@ -1,8 +1,8 @@
 name: "torch_audio_cnn"
 backend: "onnxruntime"
-max_batch_size: 1
+max_batch_size: 8
 
-default_model_filename: "cnn_model.onnx"
+default_model_filename: "mobilenetv1_w1.0_f1m_0.922_e110.onnx"
 
 input [
     {
