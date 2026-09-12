@@ -54,12 +54,12 @@ func NewTritonCatalog(client *triton.TritonClient, ttl time.Duration) *TritonCat
 	}
 }
 
-func (c *TritonCatalog) List(ctx context.Context, contract pkg.InputContract) ([]ModelInfo, error) {
+func (c *TritonCatalog) List(ctx context.Context) ([]ModelInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.cached != nil && time.Since(c.cachedAt) < c.ttl {
-		return filterUsable(c.cached, contract), nil
+		return filterUsable(c.cached), nil
 	}
 
 	models, err := c.fetch(ctx)
@@ -67,18 +67,22 @@ func (c *TritonCatalog) List(ctx context.Context, contract pkg.InputContract) ([
 		// Если кэш уже есть, отдаём его (устаревший), иначе ошибка
 		if c.cached != nil {
 			slog.Warn("failed to refresh model catalog, serving stale cache", "err", err.Error())
-			return filterUsable(c.cached, contract), nil
+			return filterUsable(c.cached), nil
 		}
 		return nil, err
 	}
 
 	c.cached = models
 	c.cachedAt = time.Now()
-	return filterUsable(models, contract), nil
+	return filterUsable(models), nil
 }
 
-func (c *TritonCatalog) IsAvailable(ctx context.Context, modelName string, contract pkg.InputContract) (bool, error) {
-	models, err := c.List(ctx, contract)
+// IsAvailable - проверяет есть ли модель запрашиваемая в тритоне
+// Ошибка тритона -> false, err
+// Модели нет в списке от тритона -> false, nil
+// Модель есть -> true, nil
+func (c *TritonCatalog) IsAvailable(ctx context.Context, modelName string) (bool, error) {
+	models, err := c.List(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -91,21 +95,21 @@ func (c *TritonCatalog) IsAvailable(ctx context.Context, modelName string, contr
 	return false, nil
 }
 
-// matchesContract проверяет, что модель принимает входной тензор из контракта
-func matchesContract(m ModelInfo, contract pkg.InputContract) bool {
+// matchesContract проверяет, что модель принимает входной аудио-тензор
+func matchesContract(m ModelInfo) bool {
 	for _, in := range m.Inputs {
-		if in.Name == contract.InputName && in.Datatype == contract.InputDatatype {
+		if in.Name == pkg.RawAudioInputName && in.Datatype == pkg.RawAudioInputDatatype {
 			return true
 		}
 	}
 	return false
 }
 
-// filterUsable оставляет только модели подходящие под контракт
-func filterUsable(models []ModelInfo, contract pkg.InputContract) []ModelInfo {
+// filterUsable оставляет только модели подходящие под аудио-контракт
+func filterUsable(models []ModelInfo) []ModelInfo {
 	usable := models[:0]
 	for _, m := range models {
-		if matchesContract(m, contract) {
+		if matchesContract(m) {
 			m.Usable = true
 			usable = append(usable, m)
 		}

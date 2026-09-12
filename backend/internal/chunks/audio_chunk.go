@@ -32,7 +32,7 @@ func ChunksFromRequest(r *http.Request) (*AudioChunks, error) {
 	}
 	defer file.Close()
 
-	return splitAudio(file, header, pkg.SecondsPerAudioChunk) // 2 секунды на кусок
+	return splitAudio(file, header, pkg.DefaultSecondsPerAudioChunk) // 2 секунды на кусок
 }
 
 // Берем мультпарт-файл, дробим его на слои с разными сдвигами и выдаем массивчики чанков звука

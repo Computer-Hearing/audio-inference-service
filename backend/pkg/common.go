@@ -15,31 +15,18 @@ import (
 
 type TaskStatus string
 
-// InputContract требования к входному тензору модели для конкретного вида задач
-type InputContract struct {
-	InputName     string
-	InputDatatype string
-}
-
-// Контракты входа по видам задач
-var (
-	AudioContract = InputContract{InputName: RawAudioInputName, InputDatatype: RawAudioInputDatatype}
-	ImageContract = InputContract{InputName: RawImageInputName, InputDatatype: RawAudioInputDatatype}
-)
-
 const (
 	// User-defined
 	UsernameCookieKey = "username"
-	UsernameHeaderKey = "X-Username"
-	ModelHeaderKey    = "X-Model"
+	ModelHeader       = "X-Model"
 	FormDataAudioKey  = "audio"
 	DefaultUsername   = "Anonim"
 	UsernameRX        = `^([a-zA-Z0-9_]+)-([a-zA-Z0-9]+)-([0-9]+)$`
 
 	// Validate Chunks
-	SecondsPerAudioChunk = 2
-	MinTailChunkSeconds  = 0.5
-	AudioWaveBucketsLen  = 40
+	DefaultSecondsPerAudioChunk = 2
+	MinTailChunkSeconds         = 0.5
+	AudioWaveBucketsLen         = 40
 
 	// Triton
 	CategoryOutputName    = "category_output"
@@ -47,7 +34,6 @@ const (
 	DefaultModelName      = "cnn_predict_pipline"
 	RawAudioInputName     = "RAW_AUDIO"
 	RawAudioInputDatatype = "TYPE_UINT8"
-	RawImageInputName     = "RAW_IMAGE"
 	MaxTritonConcurrency  = 8
 
 	UsernameFirstMin     = 4

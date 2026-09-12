@@ -20,7 +20,7 @@ func NewSQLiteTaskManager(db *sql.DB) *sqliteTaskManager {
 }
 
 func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
-	username domain.Username) (*domain.TaskResult[chunks.FileInferenceResult], error) {
+	username domain.Username) (*domain.TaskResult, error) {
 	if string(taskID) == "" {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -52,7 +52,7 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 		}
 	}
 
-	taskResult := &domain.TaskResult[chunks.FileInferenceResult]{
+	taskResult := &domain.TaskResult{
 		TaskID: taskID,
 		Status: pkg.TaskStatus(status),
 		Model:  model,
@@ -214,7 +214,7 @@ func (m *sqliteTaskManager) CreateTask(
 	return nil
 }
 
-func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload[domain.AudioTaskPayload], error) {
+func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload, error) {
 	if limit <= 0 {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -249,7 +249,7 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 	}
 	defer rows.Close()
 
-	var payloads []domain.TaskPayload[domain.AudioTaskPayload]
+	var payloads []domain.TaskPayload
 	for rows.Next() {
 		var taskID, chunksJSON, model string
 
@@ -268,7 +268,7 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 			continue
 		}
 
-		payloads = append(payloads, domain.TaskPayload[domain.AudioTaskPayload]{
+		payloads = append(payloads, domain.TaskPayload{
 			TaskID: domain.Task(taskID),
 			Payload: domain.AudioTaskPayload{
 				ModelName: model,

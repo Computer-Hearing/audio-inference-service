@@ -16,10 +16,10 @@ import (
 
 type Predictor struct {
 	TritonConnector *triton.TritonClient
-	TaskManager     modules.TaskManager[domain.AudioTaskPayload, chunks.FileInferenceResult]
+	TaskManager     modules.TaskManager
 }
 
-func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload[domain.AudioTaskPayload]) error {
+func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) error {
 	modelName := job.Payload.ModelName
 	if modelName == "" {
 		modelName = pkg.DefaultModelName

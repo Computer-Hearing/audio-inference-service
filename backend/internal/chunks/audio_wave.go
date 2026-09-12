@@ -4,6 +4,8 @@ import (
 	"audio-inference-service/pkg"
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
 	"math"
 	"mime/multipart"
@@ -36,7 +38,8 @@ func audioWaveform(file multipart.File, barCount int) ([]float64, error) {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
+		return nil, &pkg.APIError{
+			Message: fmt.Errorf("audio wave: %v", err).Error(), StatusCode: http.StatusInternalServerError}
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -44,7 +47,7 @@ func audioWaveform(file multipart.File, barCount int) ([]float64, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Start(); err != nil {
-		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
+		return nil, &pkg.APIError{Message: fmt.Errorf("audio wave: %v", err).Error(), StatusCode: http.StatusInternalServerError}
 	}
 
 	go func() {
@@ -55,12 +58,14 @@ func audioWaveform(file multipart.File, barCount int) ([]float64, error) {
 	if err := cmd.Wait(); err != nil {
 		details := make(map[string]string)
 		details["stderr"] = stderr.String()
-		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError, Details: details}
+		return nil, &pkg.APIError{
+			Message: fmt.Errorf("audio wave: %v", err).Error(), StatusCode: http.StatusInternalServerError, Details: details}
 	}
 
 	raw := stdout.Bytes()
 	if len(raw) < 2 {
-		return nil, &pkg.APIError{Message: "ffmpeg stdout empty", StatusCode: http.StatusBadRequest}
+		return nil, &pkg.APIError{
+			Message: errors.New("audio wave: ffmpeg stdout is empty").Error(), StatusCode: http.StatusBadRequest}
 	}
 
 	samples := make([]int16, len(raw)/2)

@@ -14,19 +14,19 @@ import (
 )
 
 type Handlers struct {
-	taskLoader modules.TaskManager[domain.AudioTaskPayload, chunks.FileInferenceResult]
+	taskLoader modules.TaskManager
 	catalog    modules.Catalog
 	logger     *slog.Logger
 }
 
-func New(taskLoader modules.TaskManager[domain.AudioTaskPayload, chunks.FileInferenceResult], logger *slog.Logger, catalog modules.Catalog) *Handlers {
+func New(taskLoader modules.TaskManager, logger *slog.Logger, catalog modules.Catalog) *Handlers {
 	return &Handlers{taskLoader: taskLoader, catalog: catalog, logger: logger}
 }
 
 func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	username, ok := middleware.GetUsernameFromContext(r.Context())
 	if !ok {
-		pkg.SendError(h.logger, w, fmt.Errorf("username cookie/header are empty"), http.StatusUnauthorized)
+		pkg.SendError(h.logger, w, fmt.Errorf("username cookie is empty"), http.StatusUnauthorized)
 		return
 	}
 
@@ -35,28 +35,30 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Модель для инференса: заголовок X-Model, по умолчанию default-модель
-	modelName := r.Header.Get(pkg.ModelHeaderKey)
+	// Модель для инференса: заголовок X-Model
+	modelName := r.Header.Get(pkg.ModelHeader)
 	if modelName == "" {
-		modelName = pkg.DefaultModelName
+		pkg.SendError(h.logger, w,
+			fmt.Errorf("modelname is empty"), http.StatusBadRequest)
+		return
 	}
 
-	available, err := h.catalog.IsAvailable(r.Context(), modelName, pkg.AudioContract)
+	available, err := h.catalog.IsAvailable(r.Context(), modelName)
 	if err != nil {
-		// Тритон недоступен — разрешаем только дефолтную модель, остальное отклоняем
-		if modelName != pkg.DefaultModelName {
-			pkg.SendError(h.logger, w, fmt.Errorf("model catalog unavailable, cannot verify model"), http.StatusServiceUnavailable)
-			return
-		}
+		// Тритон недоступен — отклоняем запрос
+		pkg.SendError(h.logger, w,
+			fmt.Errorf("model catalog unavailable, cannot verify model"), http.StatusServiceUnavailable)
+		return
 	} else if !available {
+		// Модели нет в тритон
 		pkg.SendError(h.logger, w, fmt.Errorf("unknown or unsupported model: %s", modelName), http.StatusBadRequest)
 		return
 	}
 
-	// генерируем таску
+	// генерируем таск id
 	taskID := domain.GenerateTaskID(username.String())
-	// получаем чанки - раздробленный звуковой файл на несколько по две секунды, переведенные в байты
 
+	// получаем чанки - раздробленный звуковой файл на несколько по две секунды, переведенные в байты
 	ch, err := chunks.ChunksFromRequest(r)
 	if err != nil {
 		h.handleError(w, err)
@@ -86,32 +88,13 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
-	kind := r.URL.Query().Get("kind")
-	contract, ok := kindToContract(kind)
-	if !ok {
-		pkg.SendError(h.logger, w, fmt.Errorf("unknown model kind"), http.StatusBadRequest)
-		return
-	}
-
-	models, err := h.catalog.List(r.Context(), contract)
+	models, err := h.catalog.List(r.Context())
 	if err != nil {
 		pkg.SendError(h.logger, w, fmt.Errorf("model catalog unavailable: %w", err), http.StatusServiceUnavailable)
 		return
 	}
 
 	pkg.SendJSON(h.logger, w, models, http.StatusOK)
-}
-
-// kindToContract мапит вид задач на контракт входа модели
-func kindToContract(kind string) (pkg.InputContract, bool) {
-	switch kind {
-	case "audio":
-		return pkg.AudioContract, true
-	case "image":
-		return pkg.ImageContract, true
-	default:
-		return pkg.InputContract{}, false
-	}
 }
 
 func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {
