@@ -7,6 +7,134 @@ const TARGET = {
   4: 'idling', 5: 'passing', 6: 'siren',
 };
 
+// ---------------------------------------------------------------------------
+// Цветовая карта амплитуды.
+// Раньше цвета были декоративным произвольным сине-фиолетовым градиентом.
+// Сейчас — стандартная для аудио-спектрограмм логика "тихо → громко":
+// тёмный синий (низкая энергия) → бирюза → зелёный → жёлтый → оранжевый → красный
+// (пик). Это ближе к общепринятым колормапам (turbo/inferno), используемым
+// в аудио-анализаторах, и читается интуитивно: чем "теплее" цвет, тем громче.
+// ---------------------------------------------------------------------------
+const COLOR_STOPS = [
+  { t: 0.0, c: [10, 14, 30] },
+  { t: 0.16, c: [32, 64, 128] },
+  { t: 0.36, c: [22, 138, 148] },
+  { t: 0.56, c: [72, 176, 92] },
+  { t: 0.74, c: [232, 202, 42] },
+  { t: 0.89, c: [240, 122, 32] },
+  { t: 1.0, c: [230, 48, 56] },
+];
+
+function colormap(t) {
+  t = Math.min(1, Math.max(0, t || 0));
+  for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
+    const a = COLOR_STOPS[i];
+    const b = COLOR_STOPS[i + 1];
+    if (t >= a.t && t <= b.t) {
+      const lt = (t - a.t) / (b.t - a.t || 1);
+      return [
+        Math.round(a.c[0] + (b.c[0] - a.c[0]) * lt),
+        Math.round(a.c[1] + (b.c[1] - a.c[1]) * lt),
+        Math.round(a.c[2] + (b.c[2] - a.c[2]) * lt),
+      ];
+    }
+  }
+  return COLOR_STOPS[COLOR_STOPS.length - 1].c;
+}
+
+// factor > 1 — светлее (к белому), factor < 1 — темнее (к чёрному)
+function shade([r, g, b], factor) {
+  if (factor >= 1) {
+    const f = factor - 1;
+    return `rgb(${r + (255 - r) * f}, ${g + (255 - g) * f}, ${b + (255 - b) * f})`;
+  }
+  return `rgb(${r * factor}, ${g * factor}, ${b * factor})`;
+}
+
+function rgba([r, g, b], a) {
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+// Уменьшаем число столбцов до аккуратного количества "объёмных" блоков —
+// с сотнями тонких палок 3D-эффект не читается, а с ~60-80 крупными
+// блоками спектрограмма выглядит как объёмный эквалайзер.
+function resample(arr, targetCount) {
+  if (!arr || arr.length <= targetCount) return arr || [];
+  const out = new Array(targetCount).fill(0);
+  const bucket = arr.length / targetCount;
+  for (let i = 0; i < targetCount; i++) {
+    const start = Math.floor(i * bucket);
+    const end = Math.max(start + 1, Math.floor((i + 1) * bucket));
+    let sum = 0;
+    let count = 0;
+    for (let j = start; j < end && j < arr.length; j++) {
+      sum += arr[j];
+      count++;
+    }
+    out[i] = count ? sum / count : 0;
+  }
+  return out;
+}
+
+// Полифилл roundRect выполняем один раз на модуль, а не при каждом рендере.
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    if (r > w / 2) r = w / 2;
+    if (r > h / 2) r = h / 2;
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h - r);
+    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    this.lineTo(x + r, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - r);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+    this.closePath();
+    return this;
+  };
+}
+
+const MAX_BARS = 72;
+const DEPTH = 7; // px "толщина" объёмного блока (смещение изометрической грани)
+
+// Рисует один "объёмный" столбец: лицевая грань + верхняя грань + боковая грань.
+function drawBlock(ctx, x, w, top, floor, color) {
+  const h = floor - top;
+  if (h <= 0) return;
+
+  // Лицевая грань — вертикальный градиент (ярче сверху, темнее у основания)
+  const front = ctx.createLinearGradient(0, top, 0, floor);
+  front.addColorStop(0, shade(color, 1.12));
+  front.addColorStop(1, shade(color, 0.5));
+  ctx.fillStyle = front;
+  ctx.fillRect(x, top, w, h);
+
+  // Верхняя грань (параллелограмм) — имитирует свет сверху-слева, даёт объём
+  ctx.beginPath();
+  ctx.moveTo(x, top);
+  ctx.lineTo(x + DEPTH, top - DEPTH);
+  ctx.lineTo(x + w + DEPTH, top - DEPTH);
+  ctx.lineTo(x + w, top);
+  ctx.closePath();
+  ctx.fillStyle = shade(color, 1.4);
+  ctx.fill();
+
+  // Боковая грань (правая) — теневая сторона блока
+  ctx.beginPath();
+  ctx.moveTo(x + w, top);
+  ctx.lineTo(x + w + DEPTH, top - DEPTH);
+  ctx.lineTo(x + w + DEPTH, floor - DEPTH);
+  ctx.lineTo(x + w, floor);
+  ctx.closePath();
+  ctx.fillStyle = shade(color, 0.6);
+  ctx.fill();
+
+  // Тонкий блик по верхней кромке лицевой грани
+  ctx.fillStyle = rgba(color, 0.12);
+  ctx.fillRect(x, top, w, Math.min(3, h));
+}
+
 export default function Spectrogram({ spectrogram, chunks, duration, currentTime }) {
   const canvasRef = useRef(null);
   const [visibleLayers, setVisibleLayers] = useState(new Set([0, 1]));
@@ -19,7 +147,7 @@ export default function Spectrogram({ spectrogram, chunks, duration, currentTime
   });
   const layerIds = Object.keys(layersMap).map(Number).sort((a, b) => a - b);
 
-  // Отрисовка 3D-спектрограммы с частицами
+  // Отрисовка объёмной спектрограммы
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv || !spectrogram || !spectrogram.length) return;
@@ -30,110 +158,94 @@ export default function Spectrogram({ spectrogram, chunks, duration, currentTime
     cv.width = W * dpr;
     cv.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, W, H);
 
-    const bars = spectrogram.length;
-    const barW = W / bars;
-    const max = Math.max(...spectrogram, 0.001);
+    // Фон под canvas — совпадает с фоном страницы, чтобы отражение снизу
+    // могло красиво "затухать" в него.
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
 
-    for (let i = 0; i < bars; i++) {
-      const t = spectrogram[i] / max;
-      const h = t * (H - 20);
-      const grad = ctx.createLinearGradient(0, H - h, 0, H);
-      const r = Math.round(30 + t * 200);
-      const g = Math.round(100 + t * 100);
-      const b = Math.round(200 + t * 55);
-      grad.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
-      grad.addColorStop(1, `rgb(${Math.round(r*0.4)}, ${Math.round(g*0.3)}, ${Math.round(b*0.5)})`);
+    const bars = resample(spectrogram, MAX_BARS);
+    const barCount = bars.length;
+    const max = Math.max(...bars, 0.001);
 
-      ctx.fillStyle = grad;
-      const x = i * barW;
-      const y = H - h;
-      const w = Math.max(1, barW - 1.5);
-      ctx.beginPath();
-      // roundRect polyfill (если нужно)
-      if (ctx.roundRect) {
-        ctx.roundRect(x, y, w, h, 4);
-      } else {
-        ctx.rect(x, y, w, h);
-      }
-      ctx.fill();
+    const topPadding = 26; // место для верхних граней блоков и искр
+    const floorY = H * 0.66; // линия "пола", ниже неё — отражение
+    const usableH = floorY - topPadding;
 
-      // Блик
-      ctx.fillStyle = `rgba(255,255,255,${0.05 + t * 0.15})`;
-      ctx.beginPath();
-      ctx.rect(x + 2, y + 2, w * 0.3, 4);
-      ctx.fill();
+    const totalGap = W - DEPTH; // резервируем DEPTH под последнюю изометрическую грань
+    const slot = totalGap / barCount;
+    const barW = Math.max(1, slot * 0.72);
+
+    const amps = []; // запоминаем для отражения и искр
+
+    for (let i = 0; i < barCount; i++) {
+      const t = bars[i] / max;
+      const h = Math.max(2, t * usableH);
+      const x = i * slot;
+      const top = floorY - h;
+      const color = colormap(t);
+      drawBlock(ctx, x, barW, top, floorY, color);
+      amps.push({ x, barW, t, top, color });
     }
 
-    // Частицы
-    const particleCount = 80;
+    // "Пол" — тонкая линия основания
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, floorY);
+    ctx.lineTo(W, floorY);
+    ctx.stroke();
+
+    // Отражение блоков в "полу" — затухающее к низу, усиливает ощущение объёма
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    amps.forEach(({ x, barW: w, t, color }) => {
+      const reflH = Math.max(2, t * (H - floorY) * 0.9);
+      const grad = ctx.createLinearGradient(0, floorY, 0, floorY + reflH);
+      grad.addColorStop(0, shade(color, 0.9));
+      grad.addColorStop(1, 'rgba(10,10,10,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, floorY, w, reflH);
+    });
+    ctx.restore();
+
+    // Искры над пиками — светящиеся частицы, цвет берём из той же колормапы
+    const particleCount = 46;
     for (let i = 0; i < particleCount; i++) {
-      const idx = Math.floor(Math.random() * bars);
-      const t = spectrogram[idx] / max;
-      if (t < 0.15) continue;
-      const x = idx * barW + barW / 2 + (Math.random() - 0.5) * barW * 1.2;
-      const y = H - 10 - t * (H - 20) - Math.random() * 15 * t;
-      const radius = 1.5 + t * 3.5;
-      const alpha = 0.3 + t * 0.6;
-      const hue = 210 + t * 60;
+      const src = amps[Math.floor(Math.random() * amps.length)];
+      if (!src || src.t < 0.18) continue;
+      const cx = src.x + src.barW / 2 + (Math.random() - 0.5) * src.barW;
+      const cy = src.top - Math.random() * 16 * src.t;
+      const radius = 1.2 + src.t * 3;
+      const alpha = 0.25 + src.t * 0.5;
+      const [r, g, b] = colormap(Math.min(1, src.t + 0.1));
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = `hsla(${hue}, 90%, 70%, ${alpha})`;
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = rgba([r, g, b], alpha);
       ctx.fill();
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 3);
-      glow.addColorStop(0, `hsla(${hue}, 90%, 70%, ${alpha * 0.3})`);
-      glow.addColorStop(1, `hsla(${hue}, 90%, 70%, 0)`);
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 3.2);
+      glow.addColorStop(0, rgba([r, g, b], alpha * 0.35));
+      glow.addColorStop(1, rgba([r, g, b], 0));
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(x, y, radius * 3, 0, Math.PI * 2);
+      ctx.arc(cx, cy, radius * 3.2, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Линия времени
+    // Линия текущего времени воспроизведения
     if (duration > 0) {
       const x = (currentTime / duration) * W;
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1;
       ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 10;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
-
-    // Сетка (очень слабая)
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i < 10; i++) {
-      const y = (i / 10) * H;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
-      ctx.stroke();
-    }
   }, [spectrogram, currentTime, duration]);
-
-  // Полифилл для roundRect, если браузер не поддерживает
-  if (!CanvasRenderingContext2D.prototype.roundRect) {
-    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
-      if (r > w/2) r = w/2;
-      if (r > h/2) r = h/2;
-      this.moveTo(x + r, y);
-      this.lineTo(x + w - r, y);
-      this.quadraticCurveTo(x + w, y, x + w, y + r);
-      this.lineTo(x + w, y + h - r);
-      this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      this.lineTo(x + r, y + h);
-      this.quadraticCurveTo(x, y + h, x, y + h - r);
-      this.lineTo(x, y + r);
-      this.quadraticCurveTo(x, y, x + r, y);
-      this.closePath();
-      return this;
-    };
-  }
 
   const toggleLayer = (l) => {
     setVisibleLayers((prev) => {
@@ -151,10 +263,19 @@ export default function Spectrogram({ spectrogram, chunks, duration, currentTime
   return (
     <div className="card">
       <strong style={{ color: '#aaa', letterSpacing: 1 }}>spectrogram</strong>
-      <canvas
-        ref={canvasRef}
-        style={{ width: '100%', height: 200, display: 'block', marginTop: 10 }}
-      />
+      <div className="spectrogram-canvas-wrap">
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: 220, display: 'block', marginTop: 10 }}
+        />
+      </div>
+
+      {/* Легенда цветовой шкалы амплитуды */}
+      <div className="spectrogram-legend">
+        <span className="muted">quiet</span>
+        <div className="spectrogram-legend-bar" />
+        <span className="muted">loud</span>
+      </div>
 
       {layerIds.length > 1 && (
         <div className="row" style={{ marginTop: 12 }}>
@@ -198,8 +319,8 @@ export default function Spectrogram({ spectrogram, chunks, duration, currentTime
                   const left = (startSec / duration) * 100;
                   const width = (chunkSec / duration) * 100;
 
-                  const catIdx = ch.category?.indexOf(Math.max(...ch.category)) ?? -1;
-                  const tgtIdx = ch.target?.indexOf(Math.max(...ch.target)) ?? -1;
+                  const catIdx = ch.category.indexOf(Math.max(...ch.category));
+                  const tgtIdx = ch.target.indexOf(Math.max(...ch.target));
 
                   return (
                     <div
