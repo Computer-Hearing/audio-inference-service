@@ -225,33 +225,36 @@ h1 small {
 }
 
 /* ---------------------------------------------------------------------
-   Диаграмма амплитуды (waveform) — легенда цветовой шкалы.
+   Диаграмма амплитуды (waveform) — обычная столбчатая диаграмма.
    Единственное место на сайте, где сознательно используется цвет.
    --------------------------------------------------------------------- */
-.waveform-canvas-wrap {
+.waveform-wrap {
+  position: relative;
   border-radius: 2px;
-  overflow: hidden;
 }
 
-.waveform-legend {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
+/* Направляющие линии от начала чанка вверх, ТОЛЬКО в область самого
+   графика (160px = высота canvas + его отступ сверху) — в ряды чанков
+   снизу линии не заходят. Базовая сетка (offset=0) — сплошная линия,
+   сетка со сдвигом +1s — пунктирная, чтобы визуально не путать два
+   разных ряда чанков. */
+.waveform-guide-line {
+  position: absolute;
+  top: 0;
+  height: 160px;
+  width: 1px;
+  pointer-events: none;
 }
-.waveform-legend-bar {
-  flex: 1;
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(
-    to right,
-    rgb(10, 14, 30),
-    rgb(32, 64, 128),
-    rgb(22, 138, 148),
-    rgb(72, 176, 92),
-    rgb(232, 202, 42),
-    rgb(240, 122, 32),
-    rgb(230, 48, 56)
+.waveform-guide-line-base {
+  background: rgba(255, 255, 255, 0.1);
+}
+.waveform-guide-line-offset {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.22) 0px,
+    rgba(255, 255, 255, 0.22) 3px,
+    rgba(255, 255, 255, 0) 3px,
+    rgba(255, 255, 255, 0) 7px
   );
 }
 
@@ -300,6 +303,10 @@ h1 small {
 }
 .chunk-box-category {
   font-weight: 600;
+}
+.chunk-box-count {
+  font-weight: 400;
+  opacity: 0.6;
 }
 .chunk-box-target {
   font-size: 9px;
