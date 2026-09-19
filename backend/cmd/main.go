@@ -65,7 +65,9 @@ func main() {
 	taskpipe.StartPipeline(ctx, taskManager, predict)
 
 	modelCatalog := catalog.NewTritonCatalog(tritonClient, 30*time.Second)
-	handlers := handlers.New(taskManager, logger, modelCatalog)
+	handlers := handlers.New(handlers.Options{
+		TaskLoader: taskManager, Catalog: modelCatalog, Models: taskManager, Logger: logger,
+	})
 	srv := &http.Server{
 		Addr:         cfg.HTTPAddr,
 		Handler:      router.New(logger, handlers, cfg.APIPrefix),

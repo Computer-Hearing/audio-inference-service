@@ -44,3 +44,9 @@ type Catalog interface {
 	// IsAvailable проверяет, что модель выбрана правильно и доступна для использования
 	IsAvailable(ctx context.Context, modelName string) (bool, error)
 }
+
+type ModelsManager interface {
+	GetModels(ctx context.Context) (map[string]domain.Model, error)
+	UpsertModel(ctx context.Context, model domain.Model) error
+	DeleteModelByName(ctx context.Context, modelName string) error
+}

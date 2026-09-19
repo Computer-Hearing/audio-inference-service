@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/joho/godotenv"
 
 	"github.com/caarlos0/env/v10"
 	"github.com/go-playground/validator/v10"
@@ -20,6 +21,9 @@ type Config struct {
 // Load читает переменные окружения и валидирует конфигурацию
 func Load() (*Config, error) {
 	cfg := &Config{}
+
+	_ = godotenv.Load(".env")
+
 	if err := env.Parse(cfg); err != nil {
 		return nil, fmt.Errorf("parse env config: %w", err)
 	}

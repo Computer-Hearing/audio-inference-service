@@ -16,11 +16,19 @@ import (
 type Handlers struct {
 	taskLoader modules.TaskManager
 	catalog    modules.Catalog
+	models     modules.ModelsManager
 	logger     *slog.Logger
 }
 
-func New(taskLoader modules.TaskManager, logger *slog.Logger, catalog modules.Catalog) *Handlers {
-	return &Handlers{taskLoader: taskLoader, catalog: catalog, logger: logger}
+type Options struct {
+	TaskLoader modules.TaskManager
+	Catalog    modules.Catalog
+	Models     modules.ModelsManager
+	Logger     *slog.Logger
+}
+
+func New(opts Options) *Handlers {
+	return &Handlers{taskLoader: opts.TaskLoader, catalog: opts.Catalog, models: opts.Models, logger: opts.Logger}
 }
 
 func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +37,6 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 		pkg.SendError(h.logger, w, fmt.Errorf("username cookie is empty"), http.StatusUnauthorized)
 		return
 	}
-
 	if err := username.IsValid(); err != nil {
 		h.handleError(w, err)
 		return
@@ -87,20 +94,14 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	pkg.SendJSON(h.logger, w, domain.TaskResponse{TaskID: taskID, Waves: waves, Model: modelName}, http.StatusCreated)
 }
 
-func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
-	models, err := h.catalog.List(r.Context())
-	if err != nil {
-		pkg.SendError(h.logger, w, fmt.Errorf("model catalog unavailable: %w", err), http.StatusServiceUnavailable)
-		return
-	}
-
-	pkg.SendJSON(h.logger, w, models, http.StatusOK)
-}
-
 func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {
 	username, ok := middleware.GetUsernameFromContext(r.Context())
 	if !ok {
 		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
+		return
+	}
+	if err := username.IsValid(); err != nil {
+		h.handleError(w, err)
 		return
 	}
 
@@ -125,6 +126,10 @@ func (h *Handlers) GetHistory(w http.ResponseWriter, r *http.Request) {
 		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
 		return
 	}
+	if err := username.IsValid(); err != nil {
+		h.handleError(w, err)
+		return
+	}
 
 	history, err := h.taskLoader.GetHistory(r.Context(), username)
 	if err != nil {
@@ -139,6 +144,10 @@ func (h *Handlers) DeleteHistory(w http.ResponseWriter, r *http.Request) {
 	username, ok := middleware.GetUsernameFromContext(r.Context())
 	if !ok {
 		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
+		return
+	}
+	if err := username.IsValid(); err != nil {
+		h.handleError(w, err)
 		return
 	}
 
@@ -185,6 +194,87 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *Handlers) UpsertModel(w http.ResponseWriter, r *http.Request) {
+	username, ok := middleware.GetUsernameFromContext(r.Context())
+	if !ok {
+		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
+		return
+	}
+	if err := username.IsValid(); err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	var model domain.Model
+	if err := pkg.ParseJSONBody(r, &model); err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	if err := h.models.UpsertModel(r.Context(), model); err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *Handlers) DeleteModel(w http.ResponseWriter, r *http.Request) {
+	username, ok := middleware.GetUsernameFromContext(r.Context())
+	if !ok {
+		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
+		return
+	}
+	if err := username.IsValid(); err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	modelName := r.PathValue("model_name")
+
+	if err := h.models.DeleteModelByName(r.Context(), modelName); err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
+	username, ok := middleware.GetUsernameFromContext(r.Context())
+	if !ok {
+		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
+		return
+	}
+	if err := username.IsValid(); err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// получаем модели от тритона
+	modelsInfo, err := h.catalog.List(r.Context())
+	if err != nil {
+		pkg.SendError(h.logger, w, fmt.Errorf("model catalog unavailable: %w", err), http.StatusServiceUnavailable)
+		return
+	}
+
+	// получаем модели из бд
+	models, err := h.models.GetModels(r.Context())
+	if err != nil {
+		pkg.SendError(h.logger, w, fmt.Errorf("models list unavailable: %w", err), http.StatusServiceUnavailable)
+	}
+
+	var joinedModels []domain.Model
+	// перебираем модели тритона и смотрим есть ли ее запись в бд
+	for _, modelInfo := range modelsInfo {
+		if model, ok := models[modelInfo.Name]; ok {
+			joinedModels = append(joinedModels, model)
+		}
+	}
+
+	pkg.SendJSON(h.logger, w, joinedModels, http.StatusOK)
 }
 
 func (h *Handlers) handleError(w http.ResponseWriter, err error) {

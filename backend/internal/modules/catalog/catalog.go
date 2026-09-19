@@ -5,14 +5,13 @@ import (
 	"audio-inference-service/pkg"
 	"context"
 	"log/slog"
-	"sort"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 )
 
-const defaultCacheTTL = 30 * time.Second
+const defaultCacheTTL = 5 * time.Minute
 
 // IOInfo описание тензора входа/выхода модели
 type IOInfo struct {
@@ -107,15 +106,13 @@ func matchesContract(m ModelInfo) bool {
 
 // filterUsable оставляет только модели подходящие под аудио-контракт
 func filterUsable(models []ModelInfo) []ModelInfo {
-	usable := models[:0]
+	usable := make([]ModelInfo, 0, len(models))
 	for _, m := range models {
 		if matchesContract(m) {
 			m.Usable = true
 			usable = append(usable, m)
 		}
 	}
-
-	sort.Slice(usable, func(a, b int) bool { return usable[a].Name < usable[b].Name })
 
 	return usable
 }
