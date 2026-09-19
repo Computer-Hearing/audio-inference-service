@@ -32,6 +32,8 @@ func main() {
 		&slog.HandlerOptions{Level: pkg.GetLoglevel(cfg.LogLevel), AddSource: pkg.GetLoglevel(cfg.LogLevel) == slog.LevelDebug}))
 	slog.SetDefault(logger)
 
+	printConfig(cfg, logger)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	db, err := pkg.SqliteOpen(cfg.DBPath, nil)
@@ -93,13 +95,11 @@ func main() {
 	}
 }
 
-func printConfig(cfg *config.Config) {
+func printConfig(cfg *config.Config, logger *slog.Logger) {
 	if cfg == nil {
 		fmt.Println("config is nil")
 		return
 	}
-
-	logger := slog.Default()
 
 	logger.Debug("config",
 		slog.String("ENV", cfg.Env),
