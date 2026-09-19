@@ -138,171 +138,108 @@ h1 small {
   margin-top: 8px;
 }
 
-/* Иконка загрузки (используется внутри объёмной сферы, см. .upload-sphere) */
+/* Иконка загрузки — простая, без декоративной "сферы" */
 .upload-icon {
-  width: 56px;
-  height: 56px;
-  fill: none;
-  stroke: #9a9a9a;
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transition: stroke 0.3s, transform 0.2s;
-  pointer-events: none; /* клик обрабатывает сфера-контейнер */
+  width: 46px;
+  height: 46px;
+  color: #8a8a8a;
+  transition: color 0.2s, transform 0.2s;
+  pointer-events: none; /* клик обрабатывает .upload-drop */
 }
 
 /* ---------------------------------------------------------------------
-   Объёмная сфера загрузки файла.
-   Полностью в оттенках серого/чёрного/белого (объём даётся градиентами
-   и тенями, а не цветом) — соответствует общей ч/б/серой стилистике сайта.
+   Индикатор текущей модели — компактная строка слева, сразу под шапкой.
+   ---------------------------------------------------------------------- */
+.model-indicator {
+  font-size: 13px;
+  color: #666;
+  letter-spacing: 0.5px;
+  margin-bottom: 22px;
+  margin-top: -14px;
+}
+.model-indicator-value {
+  color: #e0e0e0;
+}
+
+/* ---------------------------------------------------------------------
+   Карточка загрузки файла: обычный бордер-прямоугольник (без сферы),
+   со стрелками переключения модели на середине левой/правой границы.
    --------------------------------------------------------------------- */
-.upload-sphere {
+.upload-card {
   position: relative;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background:
-    radial-gradient(circle at 32% 28%, #5c5c5c 0%, #2c2c2c 42%, #101010 78%, #050505 100%);
-  box-shadow:
-    inset -18px -18px 46px rgba(0, 0, 0, 0.85),
-    inset 12px 12px 30px rgba(255, 255, 255, 0.06),
-    0 24px 46px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
-  transition: transform 0.35s ease, box-shadow 0.35s ease;
+  transition: border-color 0.2s, background 0.2s;
+}
+.upload-card.drag-over {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-/* Блик, имитирующий глянцевую поверхность шара */
-.upload-sphere-highlight {
-  position: absolute;
-  top: 14%;
-  left: 18%;
-  width: 34%;
-  height: 22%;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 80%);
-  filter: blur(1px);
-  pointer-events: none;
-}
-
-/* Едва заметное вращающееся кольцо вокруг сферы — придаёт "техно" ощущение */
-.upload-sphere-ring {
-  position: absolute;
-  inset: -12px;
-  border-radius: 50%;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  animation: sphereSpin 22s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes sphereSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.upload-sphere-content {
-  position: relative;
+.upload-drop {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  max-width: 78%;
+  gap: 14px;
+  cursor: pointer;
+  padding: 8px 40px;
+}
+.upload-drop:hover .upload-icon {
+  color: #ffffff;
+  transform: translateY(-2px);
 }
 
-.upload-sphere-filename {
-  font-size: 12px;
-  color: #d8d8d8;
-  letter-spacing: 0.3px;
+.upload-hint {
   word-break: break-all;
   text-align: center;
 }
 
-.upload-sphere:hover,
-.upload-sphere:focus-visible {
-  transform: scale(1.035);
-  box-shadow:
-    inset -18px -18px 46px rgba(0, 0, 0, 0.85),
-    inset 12px 12px 30px rgba(255, 255, 255, 0.09),
-    0 28px 54px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(255, 255, 255, 0.14);
-  outline: none;
-}
-.upload-sphere:hover .upload-icon,
-.upload-sphere:focus-visible .upload-icon {
-  stroke: #ffffff;
-}
-
-.upload-sphere.has-file {
-  background:
-    radial-gradient(circle at 32% 28%, #626262 0%, #303030 42%, #101010 78%, #050505 100%);
-}
-
-.upload-sphere.drag-over {
-  transform: scale(1.06);
-  box-shadow:
-    inset -18px -18px 46px rgba(0, 0, 0, 0.85),
-    inset 12px 12px 30px rgba(255, 255, 255, 0.12),
-    0 30px 60px rgba(0, 0, 0, 0.65),
-    0 0 0 2px rgba(255, 255, 255, 0.4);
-}
-.upload-sphere.drag-over .upload-sphere-ring {
-  border-color: rgba(255, 255, 255, 0.5);
-  animation-duration: 6s;
-}
-
-/* ---------------------------------------------------------------------
-   Вкладки выбора модели — компактная подпись под сферой.
-   Пока список моделей — заглушка ("transport audio" / "siren audio"),
-   но вёрстка уже рассчитана на любое число моделей с бэкенда.
-   --------------------------------------------------------------------- */
-.model-tabs {
+.model-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.02);
   display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
+  padding: 0;
+  color: #888;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
 }
-
-.model-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: #666;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 13px;
-  letter-spacing: 0.5px;
-  text-transform: lowercase;
-  padding: 4px 2px;
-  cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
+.model-arrow:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.06);
 }
-.model-tab:hover {
-  color: #ccc;
+.model-arrow-left {
+  left: -17px;
 }
-.model-tab.active {
-  color: #ffffff;
-  border-bottom-color: #ffffff;
+.model-arrow-right {
+  right: -17px;
+}
+.model-arrow-icon {
+  width: 16px;
+  height: 16px;
 }
 
 /* ---------------------------------------------------------------------
-   Легенда цветовой шкалы спектрограммы (единственное место на сайте,
-   где сознательно используется цвет — сам "объёмный" график амплитуды).
+   Диаграмма амплитуды (waveform) — легенда цветовой шкалы.
+   Единственное место на сайте, где сознательно используется цвет.
    --------------------------------------------------------------------- */
-.spectrogram-canvas-wrap {
+.waveform-canvas-wrap {
   border-radius: 2px;
   overflow: hidden;
 }
 
-.spectrogram-legend {
+.waveform-legend {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 16px;
 }
-.spectrogram-legend-bar {
+.waveform-legend-bar {
   flex: 1;
   height: 6px;
   border-radius: 3px;
@@ -316,6 +253,106 @@ h1 small {
     rgb(240, 122, 32),
     rgb(230, 48, 56)
   );
+}
+
+/* ---------------------------------------------------------------------
+   Ряды чанков — визуально "приклеены" прямо под диаграммой (без зазора),
+   чтобы читаться как единая сетка по времени, а не отдельный виджет.
+   Ряд со сдвигом +1s рисуется выше базового ряда — как бы поверх сетки.
+   --------------------------------------------------------------------- */
+.chunk-rows {
+  margin-top: 0;
+}
+
+.chunk-row-tag {
+  display: block;
+  font-size: 10px;
+  color: #555;
+  letter-spacing: 0.5px;
+  margin-top: 10px;
+  margin-bottom: 3px;
+}
+
+.chunk-row {
+  position: relative;
+  height: 52px;
+}
+
+.chunk-box {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 4px 6px;
+  font-size: 10px;
+  color: #aaa;
+  overflow: hidden;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.chunk-box.active {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+.chunk-box.has-error {
+  opacity: 0.35;
+}
+.chunk-box-category {
+  font-weight: 600;
+}
+.chunk-box-target {
+  font-size: 9px;
+  opacity: 0.7;
+}
+.chunk-box-error {
+  color: #ff6b5a;
+  font-size: 8px;
+}
+
+/* ---------------------------------------------------------------------
+   История — карточки с кратким итогом по каждому файлу, строго по тому,
+   что реально отдаёт API (без даты и модели — бэкенд их не хранит).
+   --------------------------------------------------------------------- */
+.history-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.history-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 14px;
+}
+.history-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.history-item-filename {
+  font-size: 15px;
+  color: #e0e0e0;
+  word-break: break-all;
+}
+.history-item-meta {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.history-item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.history-tag {
+  font-size: 11px;
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.history-tag-target {
+  color: #888;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 /* ---------------------------------------------------------------------
@@ -406,8 +443,9 @@ h1 small {
   font-size: 12px;
   color: #888;
   flex-shrink: 0;
-  min-width: 36px;
+  min-width: 64px;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .player-progress {
@@ -463,16 +501,25 @@ h1 small {
   h1 {
     font-size: 22px;
   }
-  .upload-sphere {
-    width: 160px;
-    height: 160px;
-  }
   .upload-icon {
-    width: 42px;
-    height: 42px;
+    width: 38px;
+    height: 38px;
   }
-  .model-tabs {
-    gap: 12px;
+  .upload-drop {
+    padding: 8px 34px;
+  }
+  .model-arrow {
+    width: 30px;
+    height: 30px;
+  }
+  .model-arrow-left {
+    left: -13px;
+  }
+  .model-arrow-right {
+    right: -13px;
+  }
+  .chunk-box {
+    font-size: 9px;
   }
 
   .container.has-player {
@@ -502,5 +549,6 @@ h1 small {
   }
   .player-time {
     order: 3;
+    min-width: 56px;
   }
 }
