@@ -1,18 +1,18 @@
 // src/components/Waveform.jsx
 //
-// Раньше компонент назывался Spectrogram, хотя настоящим спектрограммой
+// Раньше компонент назывался Spectrogram, хотя настоящей спектрограммой
 // (частота × время) не является: бэкенд отдаёт всего один плоский массив
 // RMS-амплитуды по времени (pkg.AudioWaveBucketsLen = 40 "бакетов" на весь
 // файл, см. chunks.audioWaveform на бэкенде). Это обычная диаграмма
 // громкости во времени — переименовано в Waveform, чтобы не вводить в
 // заблуждение.
 //
-// Главная идея переработки: диаграмма и ряды чанков ниже — это одна общая
-// сетка по времени, а не два независимых виджета. Столбцы диаграммы
-// пересчитываются (агрегируются) так, чтобы их границы ровно совпадали с
-// границами чанков базового слоя (offset=0) — то есть чанки служат
-// "засечками"/направляющими для графика. Слой со сдвигом +1s рисуется
-// отдельной строкой прямо над базовым рядом чанков — как бы поверх сетки.
+// Диаграмма рисуется по старому, простому принципу: один столбик — один
+// элемент массива waves, столбики равномерно распределены по всей ширине
+// (без привязки/пересчёта под границы чанков). Ряды чанков под диаграммой —
+// отдельная, независимая по разметке штука, как и раньше. Единственная
+// связь между ними — тонкие направляющие линии, идущие от начала каждого
+// базового чанка вверх, в область графика.
 import { useEffect, useRef } from 'react';
 
 const CATEGORY = { 0: 'car', 1: 'emv', 2: 'motorcycle', 3: 'tram', 4: 'truck' };
@@ -65,50 +65,47 @@ function argmaxIndex(arr) {
   return best;
 }
 
+// Схлопывает подряд идущие чанки с одинаковым предсказанием (категория +
+// звук) в один визуальный блок — если модель несколько чанков подряд
+// выдаёт одно и то же, незачем рисовать это как несколько одинаковых
+// табличек подряд. Ошибочные чанки друг с другом не схлопываются — каждый
+// остаётся отдельным блоком, чтобы не потерять, где именно была ошибка.
+function mergeGroups(ranges, chunksArr) {
+  const groups = [];
+  chunksArr.forEach((ch, i) => {
+    const { start, end } = ranges[i];
+    const catIdx = argmaxIndex(ch.category);
+    const tgtIdx = argmaxIndex(ch.target);
+    const isError = !!ch.error;
+
+    const last = groups[groups.length - 1];
+    const sameAsLast =
+      last && !isError && !last.error && last.catIdx === catIdx && last.tgtIdx === tgtIdx;
+
+    if (sameAsLast) {
+      last.end = end;
+      last.count += 1;
+    } else {
+      groups.push({ start, end, catIdx, tgtIdx, error: isError, count: 1 });
+    }
+  });
+  return groups;
+}
+
 // -----------------------------------------------------------------------
-// Границы чанков по времени.
+// Границы чанков по времени (нужны только для рядов чанков ниже графика).
 // Правило (согласовано с бэкендом, см. internal/chunks/audio_chunk.go):
 //  - базовый слой (offset=0): чанки фиксированного размера chunkSeconds,
 //    последний чанк может быть короче (хвост длительностью duration % chunkSeconds,
-//    если этот хвост длится дольше ~0.5s — иначе бэкенд его просто отбрасывает,
-//    и в chunks его тоже не будет).
+//    если этот хвост длится дольше ~0.5s — иначе бэкенд его просто отбрасывает).
 //  - слои со сдвигом (offset=1s и т.д.): те же чанки фиксированного размера,
-//    только считаются от отметки offset, и хвост НЕ создаётся (отбрасывается
-//    целиком, если не наберётся полный chunkSeconds).
-// Опираемся на chunk_index и offset, которые уже возвращает бэкенд —
-// поэтому здесь просто считаем, а не гадаем количество чанков.
+//    считаются от отметки offset, хвост НЕ создаётся.
+// Опираемся на chunk_index и offset, которые уже возвращает бэкенд.
 // -----------------------------------------------------------------------
 function chunkRange(offset, chunkIndex, chunkSeconds, duration) {
   const start = offset + chunkIndex * chunkSeconds;
   const end = Math.min(duration, start + chunkSeconds);
   return { start, end: Math.max(start, end) };
-}
-
-// Пересчитывает 40-точечный (или любой другой длины) массив амплитуд,
-// равномерно покрывающий [0, duration], в один агрегированный уровень на
-// каждый переданный временной диапазон — усредняя перекрывающиеся "бакеты"
-// пропорционально площади перекрытия. Так столбец диаграммы получает
-// границы ровно там же, где границы чанка.
-function resampleToRanges(waves, duration, ranges) {
-  if (!waves || !waves.length || !duration) return ranges.map(() => 0);
-  const n = waves.length;
-  const bucketDur = duration / n;
-
-  return ranges.map(({ start, end }) => {
-    if (end <= start) return 0;
-    let sum = 0;
-    let weight = 0;
-    for (let i = 0; i < n; i++) {
-      const bStart = i * bucketDur;
-      const bEnd = bStart + bucketDur;
-      const overlap = Math.min(end, bEnd) - Math.max(start, bStart);
-      if (overlap > 0) {
-        sum += waves[i] * overlap;
-        weight += overlap;
-      }
-    }
-    return weight > 0 ? sum / weight : 0;
-  });
 }
 
 export default function Waveform({ waves, chunks, duration, currentTime, chunkSeconds }) {
@@ -128,10 +125,17 @@ export default function Waveform({ waves, chunks, duration, currentTime, chunkSe
   const baseRanges = baseChunks.map((ch) => chunkRange(0, ch.chunk_index, chunkSeconds, duration));
   const offsetRanges = offsetChunks.map((ch) => chunkRange(offsetSeconds, ch.chunk_index, chunkSeconds, duration));
 
-  // Отрисовка диаграммы — плоские (2D) столбцы, без объёма, без "линии спектра".
+  // Схлопнутые блоки считаем один раз — они нужны и для отрисовки рядов,
+  // и для направляющих линий (линии должны идти по границам итоговых
+  // блоков, а не по границам "исходных" чанков, которые в них слились).
+  const baseGroups = mergeGroups(baseRanges, baseChunks);
+  const offsetGroups = mergeGroups(offsetRanges, offsetChunks);
+
+  // Обычная столбчатая диаграмма: один столбик — один элемент waves,
+  // столбики равномерно распределены по ширине (без привязки к чанкам).
   useEffect(() => {
     const cv = canvasRef.current;
-    if (!cv || !duration || !baseRanges.length) return;
+    if (!cv || !waves || !waves.length) return;
     const ctx = cv.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const W = cv.clientWidth;
@@ -141,18 +145,19 @@ export default function Waveform({ waves, chunks, duration, currentTime, chunkSe
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
-    const amps = resampleToRanges(waves, duration, baseRanges);
-    const max = Math.max(...amps, 0.001);
+    const n = waves.length;
+    const max = Math.max(...waves, 0.001);
+    const gap = 1;
+    const barW = Math.max(1, W / n - gap);
 
     const topPadding = 10;
     const floorY = H;
     const usableH = floorY - topPadding;
 
-    baseRanges.forEach((range, i) => {
-      const t = amps[i] / max;
+    for (let i = 0; i < n; i++) {
+      const t = waves[i] / max;
       const h = Math.max(2, t * usableH);
-      const x = (range.start / duration) * W;
-      const w = Math.max(1, ((range.end - range.start) / duration) * W - 1);
+      const x = (i / n) * W;
       const top = floorY - h;
       const color = colormap(t);
 
@@ -160,90 +165,89 @@ export default function Waveform({ waves, chunks, duration, currentTime, chunkSe
       grad.addColorStop(0, rgb(color, 1.15));
       grad.addColorStop(1, rgb(color, 0.65));
       ctx.fillStyle = grad;
-      ctx.fillRect(x, top, w, h);
+      ctx.fillRect(x, top, barW, h);
+    }
+  }, [waves]);
 
-      // Ошибочный чанк — гасим цвет, чтобы было видно проблемное место
-      const chunk = baseChunks[i];
-      if (chunk?.error) {
-        ctx.fillStyle = 'rgba(10,10,10,0.55)';
-        ctx.fillRect(x, top, w, h);
-      }
-    });
-
-    // Направляющие линии по границам базовых чанков — визуально "сшивают"
-    // диаграмму с рядами чанков ниже (единая сетка по времени).
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
-    baseRanges.forEach((range) => {
-      const x = Math.round((range.start / duration) * W) + 0.5;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, H);
-      ctx.stroke();
-    });
-    const lastX = Math.round(W) - 0.5;
-    ctx.beginPath();
-    ctx.moveTo(lastX, 0);
-    ctx.lineTo(lastX, H);
-    ctx.stroke();
-  }, [waves, chunks, duration, chunkSeconds]);
-
-  const renderChunkRow = (ranges, rowChunks, extraClass) => (
+  const renderChunkRow = (groups, extraClass) => (
     <div className={`chunk-row ${extraClass}`}>
-      {rowChunks.map((ch, i) => {
-        const { start, end } = ranges[i];
+      {groups.map((g, i) => {
         if (!duration) return null;
-        const left = (start / duration) * 100;
-        const width = ((end - start) / duration) * 100;
-        const isActive = currentTime >= start && currentTime < end;
-
-        const catIdx = argmaxIndex(ch.category);
-        const tgtIdx = argmaxIndex(ch.target);
+        const left = (g.start / duration) * 100;
+        const width = ((g.end - g.start) / duration) * 100;
+        const isActive = currentTime >= g.start && currentTime < g.end;
 
         return (
           <div
-            key={`${extraClass}-${ch.chunk_index}`}
-            className={`chunk-box${isActive ? ' active' : ''}${ch.error ? ' has-error' : ''}`}
+            key={`${extraClass}-${i}`}
+            className={`chunk-box${isActive ? ' active' : ''}${g.error ? ' has-error' : ''}`}
             style={{ left: `${left}%`, width: `calc(${width}% - 1px)` }}
           >
-            <div className="chunk-box-category">{CATEGORY[catIdx] || '?'}</div>
-            <div className="chunk-box-target">{TARGET[tgtIdx] || '?'}</div>
-            {ch.error && <div className="chunk-box-error">error</div>}
+            <div className="chunk-box-category">
+              {CATEGORY[g.catIdx] || '?'}
+              {g.count > 1 && !g.error && <span className="chunk-box-count"> ×{g.count}</span>}
+            </div>
+            <div className="chunk-box-target">{TARGET[g.tgtIdx] || '?'}</div>
+            {g.error && <div className="chunk-box-error">error</div>}
           </div>
         );
       })}
     </div>
   );
 
+  // Направляющие линии вверх, в область графика — по границам уже
+  // схлопнутых блоков (начало слева, конец справа), а не по границам
+  // "исходных" чанков внутри одного блока — они больше не нужны, раз
+  // блок визуально единый. Базовая сетка (offset=0) — сплошные линии,
+  // сетка со сдвигом +1s — пунктирные.
+  const baseGuideLines = duration
+    ? [...baseGroups.map((g) => g.start), duration]
+    : [];
+  const offsetGuideLines = duration
+    ? [
+        ...offsetGroups.map((g) => g.start),
+        ...(offsetGroups.length ? [offsetGroups[offsetGroups.length - 1].end] : []),
+      ]
+    : [];
+
   return (
     <div className="card">
       <strong style={{ color: '#aaa', letterSpacing: 1 }}>waveform</strong>
 
-      <div className="waveform-canvas-wrap">
+      <div className="waveform-wrap">
         <canvas
           ref={canvasRef}
+          className="waveform-canvas"
           style={{ width: '100%', height: 150, display: 'block', marginTop: 10 }}
         />
-      </div>
 
-      {baseChunks.length > 0 && (
-        <div className="chunk-rows">
-          {offsetChunks.length > 0 && (
-            <>
-              <span className="chunk-row-tag">+{offsetSeconds}s</span>
-              {renderChunkRow(offsetRanges, offsetChunks, 'chunk-row-offset')}
-            </>
-          )}
-          <span className="chunk-row-tag">base</span>
-          {renderChunkRow(baseRanges, baseChunks, 'chunk-row-base')}
-        </div>
-      )}
+        {baseChunks.length > 0 && (
+          <div className="chunk-rows">
+            {offsetChunks.length > 0 && (
+              <>
+                <span className="chunk-row-tag">+{offsetSeconds}s</span>
+                {renderChunkRow(offsetGroups, 'chunk-row-offset')}
+              </>
+            )}
+            <span className="chunk-row-tag">base</span>
+            {renderChunkRow(baseGroups, 'chunk-row-base')}
+          </div>
+        )}
 
-      {/* Легенда цветовой шкалы амплитуды */}
-      <div className="waveform-legend">
-        <span className="muted">quiet</span>
-        <div className="waveform-legend-bar" />
-        <span className="muted">loud</span>
+        {baseGuideLines.map((sec, i) => (
+          <div
+            key={`base-${i}`}
+            className="waveform-guide-line waveform-guide-line-base"
+            style={{ left: `${(sec / duration) * 100}%` }}
+          />
+        ))}
+        {offsetGuideLines.map((sec, i) => (
+          <div
+            key={`offset-${i}`}
+            className="waveform-guide-line waveform-guide-line-offset"
+            style={{ left: `${(sec / duration) * 100}%` }}
+          />
+        ))}
       </div>
     </div>
   );

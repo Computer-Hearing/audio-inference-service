@@ -12,17 +12,6 @@ import Waveform from './Waveform.jsx';
 import History from './History.jsx';
 import Player from './Player.jsx';
 
-// -----------------------------------------------------------------------
-// TODO(backend): временная заглушка на случай, если каталог моделей пуст
-// (бэкенд ещё не поднял Triton / список моделей недоступен). Как только
-// GET /api/v1/models начнёт стабильно отдавать реальные модели — заглушка
-// просто не будет использоваться (см. useEffect ниже).
-// -----------------------------------------------------------------------
-const MOCK_MODELS = [
-  { name: 'transport audio' },
-  { name: 'siren audio' },
-];
-
 function truncateName(name, max = 40) {
   if (!name || name.length <= max) return name;
   const half = Math.floor((max - 1) / 2);
@@ -101,14 +90,17 @@ export default function Main() {
   const handleRaw = (info) => setRawLog((prev) => [...prev, info]);
 
   useEffect(() => {
+    // Список моделей — строго с бэкенда (GET /api/v1/models), никаких
+    // заглушек: если список пуст, значит модели ещё не заведены в БД
+    // (см. domain.Model / UpsertModel на бэкенде) — это состояние явно
+    // показывается пользователю, а не подменяется фейковыми названиями.
     getModels()
       .then((list) => {
-        const finalList = list && list.length ? list : MOCK_MODELS;
-        setModels(finalList);
+        setModels(list || []);
         setModelIndex(0);
       })
       .catch(() => {
-        setModels(MOCK_MODELS);
+        setModels([]);
         setModelIndex(0);
       });
   }, []);
@@ -133,7 +125,7 @@ export default function Main() {
 
   const currentModel = models[modelIndex] || null;
   const currentModelId = modelId(currentModel);
-  const currentModelLabel = modelLabel(currentModel) || '—';
+  const currentModelLabel = modelLabel(currentModel) || 'no models available';
 
   const goToModel = (delta) => {
     if (!models.length) return;
@@ -300,7 +292,7 @@ export default function Main() {
             />
 
             <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
-              <button onClick={handleAnalyze} disabled={!file || state === 'analyzing'}>
+              <button onClick={handleAnalyze} disabled={!file || !currentModelId || state === 'analyzing'}>
                 {state === 'analyzing' ? 'analyzing...' : 'analyze'}
               </button>
               {(file || waves) && <button onClick={handleReset}>reset</button>}
