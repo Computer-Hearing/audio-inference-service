@@ -82,6 +82,13 @@ func tables(db *sql.DB) error {
     		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
+	    CREATE TABLE IF NOT EXISTS models (
+	       id INTEGER PRIMARY KEY AUTOINCREMENT,
+	       title TEXT NOT NULL,
+	       description TEXT DEFAULT '',
+	       model_name TEXT UNIQUE NOT NULL,
+	       seconds_per_chunk INTEGER NOT NULL
+	    );
 	`
 	if _, err := db.ExecContext(context.Background(), query); err != nil {
 		return err

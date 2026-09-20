@@ -399,3 +399,98 @@ func (m *sqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domai
 
 	return nil
 }
+
+// ------------------------- РАБОТА С МОДЕЛЯМИ -------------------------------------------------------------------------
+
+func (m *sqliteTaskManager) GetModels(ctx context.Context) (map[string]domain.Model, error) {
+	query := `
+		SELECT id, title, description, model_name, seconds_per_chunk
+		FROM models
+	`
+	var models = make(map[string]domain.Model)
+
+	rows, err := m.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, pkg.APIError{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Database error while getting models",
+			Details:    map[string]string{"error": err.Error()},
+		}
+	}
+	for rows.Next() {
+		var (
+			id                            int64
+			secondsPerChunk               uint8
+			title, description, modelName string
+		)
+
+		err := rows.Scan(&id, &title, &description, &modelName, &secondsPerChunk)
+		if err != nil {
+			return nil, pkg.APIError{
+				StatusCode: http.StatusInternalServerError,
+				Message:    "Database error while scanning model",
+				Details:    map[string]string{"error": err.Error()},
+			}
+		}
+
+		models[modelName] = domain.Model{
+			ID:              id,
+			Title:           title,
+			ModelName:       modelName,
+			SecondsPerChunk: secondsPerChunk,
+			Description:     description,
+		}
+	}
+
+	return models, nil
+}
+
+func (m *sqliteTaskManager) DeleteModelByName(ctx context.Context, modelName string) error {
+	if modelName == "" {
+		return pkg.APIError{
+			StatusCode: http.StatusBadRequest,
+			Message:    "model name is required",
+		}
+	}
+
+	query := `
+		DELETE FROM models WHERE model_name = ?
+	`
+
+	_, err := m.db.ExecContext(ctx, query, modelName)
+	if err != nil {
+		return pkg.APIError{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Database error while deleting model",
+			Details:    map[string]string{"error": err.Error()},
+		}
+	}
+
+	return nil
+}
+
+func (m *sqliteTaskManager) UpsertModel(ctx context.Context, model domain.Model) error {
+	if err := model.Validate(); err != nil {
+		return err
+	}
+
+	query := `
+		INSERT INTO models (title, description, model_name, seconds_per_chunk)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT (model_name) DO UPDATE 
+		SET title = EXCLUDED.title,
+			description = EXCLUDED.description,
+			seconds_per_chunk = EXCLUDED.seconds_per_chunk,
+		    id = EXCLUDED.id
+	`
+
+	_, err := m.db.ExecContext(ctx, query, model.Title, model.Description, model.ModelName, model.SecondsPerChunk)
+	if err != nil {
+		return pkg.APIError{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "Database error while upsert model",
+			Details:    map[string]string{"error": err.Error()},
+		}
+	}
+	return nil
+}
