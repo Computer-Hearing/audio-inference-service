@@ -10,8 +10,9 @@ export default defineConfig({
   server: {
     proxy: {
       [API_PATH]: {
-        target: 'http://localhost:80',
+        target: 'https://tools.kuronami.fun',
         changeOrigin: true,
+        secure: true,
       },
     },
   },
