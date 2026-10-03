@@ -11,7 +11,8 @@ service InferenceService {
 
 message CreateTaskRequest {
   bytes audio_file = 1;
-  string model_name = 2;
+  string filename = 2;
+  string model_name = 3;
 }
 
 message CreateTaskResponse {
@@ -30,10 +31,10 @@ message Task {
   string task_id = 1;
   TaskStatus status = 2;
   string model = 3;
-  Result result = 4;
+  TaskResult result = 4;
 }
 
-message Result {
+message TaskResult {
   string filename = 1;
   repeated Chunk chunks = 2;
 }

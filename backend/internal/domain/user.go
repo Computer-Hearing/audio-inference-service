@@ -30,7 +30,3 @@ func (u Username) IsValid() error {
 
 	return nil
 }
-
-func ToUsername(username string) Username {
-	return Username(username)
-}
