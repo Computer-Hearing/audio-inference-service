@@ -2,7 +2,6 @@ package domain
 
 import (
 	"audio-inference-service/internal/chunks"
-	"audio-inference-service/pkg"
 	"crypto/md5"
 	"fmt"
 
@@ -19,6 +18,8 @@ func (t Task) String() string {
 func GenerateTaskID(userName string) Task {
 	return Task(fmt.Sprintf("%x", md5.Sum([]byte(userName+uuid.NewString()))))
 }
+
+type TaskStatus string
 
 // TaskPayload задача с типизированными данными для обработки
 type TaskPayload struct {
@@ -42,7 +43,7 @@ type TaskResponse struct {
 // TaskResult задача с её статусом и результатом инференса (если он уже сохранён)
 type TaskResult struct {
 	TaskID Task                        `json:"task_id"`
-	Status pkg.TaskStatus              `json:"status"`
+	Status TaskStatus                  `json:"status"`
 	Model  string                      `json:"model,omitempty"`
 	Result *chunks.FileInferenceResult `json:"result,omitempty"`
 }

@@ -54,7 +54,7 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 
 	taskResult := &domain.TaskResult{
 		TaskID: taskID,
-		Status: pkg.TaskStatus(status),
+		Status: domain.TaskStatus(status),
 		Model:  model,
 	}
 

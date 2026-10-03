@@ -17,3 +17,11 @@ message CreateTaskResponse {
   int32 id = 1;
   string name = 2;
 }
+
+message GetTaskRequest {
+  string task_id = 1;
+}
+
+message GetTaskResponse {
+
+}
