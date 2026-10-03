@@ -1,8 +1,9 @@
 package sqlite
 
 import (
-	"audio-inference-service/internal/chunks"
 	"audio-inference-service/internal/domain"
+	"audio-inference-service/internal/domain/dto"
+	"audio-inference-service/internal/modules/audio"
 	"audio-inference-service/pkg"
 	"context"
 	"database/sql"
@@ -11,16 +12,16 @@ import (
 	"net/http"
 )
 
-type sqliteTaskManager struct {
+type SqliteTaskManager struct {
 	db *sql.DB
 }
 
-func NewSQLiteTaskManager(db *sql.DB) *sqliteTaskManager {
-	return &sqliteTaskManager{db: db}
+func NewSQLiteTaskManager(db *sql.DB) *SqliteTaskManager {
+	return &SqliteTaskManager{db: db}
 }
 
-func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
-	username domain.Username) (*domain.TaskResult, error) {
+func (m *SqliteTaskManager) GetTask(ctx context.Context, taskID domain.TaskID,
+	username domain.Username) (*domain.Task, error) {
 	if string(taskID) == "" {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -52,14 +53,14 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 		}
 	}
 
-	taskResult := &domain.TaskResult{
+	taskResult := &domain.Task{
 		TaskID: taskID,
-		Status: domain.TaskStatus(status),
+		Status: dto.TaskStatusFromString(status),
 		Model:  model,
 	}
 
 	if resultJSON.Valid && resultJSON.String != "" {
-		var res chunks.FileInferenceResult
+		var res domain.FileInferenceResult
 		if err := json.Unmarshal([]byte(resultJSON.String), &res); err != nil {
 			return nil, pkg.APIError{
 				StatusCode: http.StatusInternalServerError,
@@ -73,7 +74,7 @@ func (m *sqliteTaskManager) GetTask(ctx context.Context, taskID domain.Task,
 	return taskResult, nil
 }
 
-func (m *sqliteTaskManager) GetHistory(ctx context.Context, username domain.Username) ([]*chunks.FileInferenceResult, error) {
+func (m *SqliteTaskManager) GetHistory(ctx context.Context, username domain.Username) ([]*domain.FileInferenceResult, error) {
 	if string(username) == "" {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -82,9 +83,10 @@ func (m *sqliteTaskManager) GetHistory(ctx context.Context, username domain.User
 		}
 	}
 
-	query := `SELECT result FROM tasks WHERE username = ? AND status = 'success' ORDER BY created_at DESC`
+	query := `SELECT result FROM tasks WHERE username = ? AND status = ? ORDER BY created_at DESC`
+	args := []any{username, dto.TaskStatusToString(domain.TaskStatusSuccess)}
 
-	rows, err := m.db.QueryContext(ctx, query, username)
+	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -94,7 +96,7 @@ func (m *sqliteTaskManager) GetHistory(ctx context.Context, username domain.User
 	}
 	defer rows.Close()
 
-	var history []*chunks.FileInferenceResult
+	var history []*domain.FileInferenceResult
 	for rows.Next() {
 		var resultJSON string
 		if err := rows.Scan(&resultJSON); err != nil {
@@ -105,7 +107,7 @@ func (m *sqliteTaskManager) GetHistory(ctx context.Context, username domain.User
 			}
 		}
 
-		var res chunks.FileInferenceResult
+		var res domain.FileInferenceResult
 		if err := json.Unmarshal([]byte(resultJSON), &res); err != nil {
 			return nil, pkg.APIError{
 				StatusCode: http.StatusInternalServerError,
@@ -127,7 +129,7 @@ func (m *sqliteTaskManager) GetHistory(ctx context.Context, username domain.User
 	return history, nil
 }
 
-func (m *sqliteTaskManager) DeleteHistory(ctx context.Context, username domain.Username) error {
+func (m *SqliteTaskManager) DeleteHistory(ctx context.Context, username domain.Username) error {
 	if string(username) == "" {
 		return pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -149,9 +151,9 @@ func (m *sqliteTaskManager) DeleteHistory(ctx context.Context, username domain.U
 	return nil
 }
 
-func (m *sqliteTaskManager) CreateTask(
+func (m *SqliteTaskManager) CreateTask(
 	ctx context.Context, username domain.Username,
-	taskID domain.Task, payload domain.AudioTaskPayload) error {
+	taskID domain.TaskID, payload domain.AudioTaskPayload) error {
 	// Валидация всех полей
 	details := make(map[string]string)
 	if string(username) == "" {
@@ -166,11 +168,6 @@ func (m *sqliteTaskManager) CreateTask(
 	if payload.ModelName == "" {
 		details["model"] = "cannot be empty"
 	}
-	if len(payload.Wave) == 0 {
-		// Спектрограмму пока что пустой пропускаем, если есть, посмотрим потом.
-		// details["wave"] = "cannot be empty"
-	}
-
 	if len(details) > 0 {
 		return pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -188,21 +185,16 @@ func (m *sqliteTaskManager) CreateTask(
 		}
 	}
 
-	waveJSON, err := json.Marshal(payload.Wave)
-	if err != nil {
-		return pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to marshal wave data",
-			Details:    map[string]string{"error": err.Error()},
-		}
-	}
-
 	query := `
-		INSERT INTO tasks (id, username, status, model, chunks, wave, created_at, updated_at) 
-		VALUES (?, ?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		INSERT INTO tasks (id, username, status, model, chunks, created_at, updated_at) 
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`
 
-	_, err = m.db.ExecContext(ctx, query, taskID, username, payload.ModelName, string(chunksJSON), string(waveJSON))
+	_, err = m.db.ExecContext(ctx, query,
+		taskID, username,
+		dto.TaskStatusToString(domain.TaskStatusPending),
+		payload.ModelName, string(chunksJSON),
+	)
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -214,7 +206,7 @@ func (m *sqliteTaskManager) CreateTask(
 	return nil
 }
 
-func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload, error) {
+func (m *SqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload, error) {
 	if limit <= 0 {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -225,13 +217,13 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 
 	query := `
 		UPDATE tasks
-		SET status = 'processing',
+		SET status = ?,
 		    updated_at = CURRENT_TIMESTAMP,
 		    retry_count = retry_count + 1
 		WHERE id IN (
 			SELECT id FROM tasks
-			WHERE (status = 'pending' 
-			   OR (status = 'processing' AND updated_at < datetime('now', '-10 minutes')))
+			WHERE (status = ? 
+			   OR (status = ? AND updated_at < datetime('now', '-10 minutes')))
 			  AND retry_count < 3
 			ORDER BY created_at ASC
 			LIMIT ?
@@ -239,7 +231,12 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 		RETURNING id, chunks, model
 	`
 
-	rows, err := m.db.QueryContext(ctx, query, limit)
+	rows, err := m.db.QueryContext(ctx, query,
+		dto.TaskStatusToString(domain.TaskStatusProcessing),
+		dto.TaskStatusToString(domain.TaskStatusPending),
+		dto.TaskStatusToString(domain.TaskStatusProcessing),
+		limit,
+	)
 	if err != nil {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -261,15 +258,15 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 			}
 		}
 
-		var c chunks.AudioChunks
+		var c audio.AudioChunks
 		if err := json.Unmarshal([]byte(chunksJSON), &c); err != nil {
 			// Локализуем ошибку: помечаем конкретную задачу битой и идем к следующей
-			_ = m.IncrementTaskError(ctx, domain.Task(taskID))
+			_ = m.IncrementTaskError(ctx, domain.TaskID(taskID))
 			continue
 		}
 
 		payloads = append(payloads, domain.TaskPayload{
-			TaskID: domain.Task(taskID),
+			TaskID: domain.TaskID(taskID),
 			Payload: domain.AudioTaskPayload{
 				ModelName: model,
 				Chunks:    c,
@@ -280,7 +277,7 @@ func (m *sqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 	return payloads, nil
 }
 
-func (m *sqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Task, result *chunks.FileInferenceResult) error {
+func (m *SqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.TaskID, result *domain.FileInferenceResult) error {
 	details := make(map[string]string)
 	if string(taskID) == "" {
 		details["taskID"] = "cannot be empty"
@@ -308,13 +305,13 @@ func (m *sqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Tas
 
 	query := `
 		UPDATE tasks 
-		SET status = 'success', 
+		SET status = ?, 
 		    result = ?, 
 		    updated_at = CURRENT_TIMESTAMP 
 		WHERE id = ?
 	`
 
-	_, err = m.db.ExecContext(ctx, query, string(resultJSON), taskID)
+	_, err = m.db.ExecContext(ctx, query, dto.TaskStatusToString(domain.TaskStatusSuccess), string(resultJSON), taskID)
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -326,7 +323,7 @@ func (m *sqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Tas
 	return nil
 }
 
-func (m *sqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Task, result *chunks.FileInferenceResult) error {
+func (m *SqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.TaskID, result *domain.FileInferenceResult) error {
 	if string(taskID) == "" {
 		return pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -350,13 +347,13 @@ func (m *sqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Tas
 
 	query := `
 		UPDATE tasks 
-		SET status = 'failure', 
+		SET status = ?, 
 		    result = ?, 
 		    updated_at = CURRENT_TIMESTAMP 
 		WHERE id = ?
 	`
 
-	_, err := m.db.ExecContext(ctx, query, resultJSON, taskID)
+	_, err := m.db.ExecContext(ctx, query, dto.TaskStatusToString(domain.TaskStatusFailure), resultJSON, taskID)
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -368,7 +365,7 @@ func (m *sqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Tas
 	return nil
 }
 
-func (m *sqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domain.Task) error {
+func (m *SqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domain.TaskID) error {
 	if string(taskID) == "" {
 		return pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -381,14 +378,18 @@ func (m *sqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domai
 		UPDATE tasks 
 		SET retry_count = retry_count + 1,
 		    status = CASE 
-		        WHEN retry_count >= 2 THEN 'failure' 
-		        ELSE 'pending' 
+		        WHEN retry_count >= 2 THEN ? 
+		        ELSE ? 
 		    END,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 
-	_, err := m.db.ExecContext(ctx, query, taskID)
+	_, err := m.db.ExecContext(ctx, query,
+		dto.TaskStatusToString(domain.TaskStatusFailure),
+		dto.TaskStatusToString(domain.TaskStatusPending),
+		taskID,
+	)
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
@@ -402,7 +403,7 @@ func (m *sqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domai
 
 // ------------------------- РАБОТА С МОДЕЛЯМИ -------------------------------------------------------------------------
 
-func (m *sqliteTaskManager) GetModels(ctx context.Context) (map[string]domain.Model, error) {
+func (m *SqliteTaskManager) GetModels(ctx context.Context) (map[string]domain.Model, error) {
 	query := `
 		SELECT id, title, description, model_name, seconds_per_chunk
 		FROM models
@@ -445,7 +446,7 @@ func (m *sqliteTaskManager) GetModels(ctx context.Context) (map[string]domain.Mo
 	return models, nil
 }
 
-func (m *sqliteTaskManager) DeleteModelByName(ctx context.Context, modelName string) error {
+func (m *SqliteTaskManager) DeleteModelByName(ctx context.Context, modelName string) error {
 	if modelName == "" {
 		return pkg.APIError{
 			StatusCode: http.StatusBadRequest,
@@ -469,7 +470,7 @@ func (m *sqliteTaskManager) DeleteModelByName(ctx context.Context, modelName str
 	return nil
 }
 
-func (m *sqliteTaskManager) UpsertModel(ctx context.Context, model domain.Model) error {
+func (m *SqliteTaskManager) UpsertModel(ctx context.Context, model domain.Model) error {
 	if err := model.Validate(); err != nil {
 		return err
 	}

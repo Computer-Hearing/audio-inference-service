@@ -6,6 +6,7 @@ option go_package = "audio-inference-service/gen/inference/v1;inferencev1";
 
 service InferenceService {
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
 }
 
 message CreateTaskRequest {
@@ -14,8 +15,7 @@ message CreateTaskRequest {
 }
 
 message CreateTaskResponse {
-  int32 id = 1;
-  string name = 2;
+  Task task = 1;
 }
 
 message GetTaskRequest {
@@ -23,5 +23,34 @@ message GetTaskRequest {
 }
 
 message GetTaskResponse {
+  Task task = 1;
+}
 
+message Task {
+  string task_id = 1;
+  TaskStatus status = 2;
+  string model = 3;
+  Result result = 4;
+}
+
+message Result {
+  string filename = 1;
+  repeated Chunk chunks = 2;
+}
+
+message Chunk {
+  int32 chunk_index = 1;
+  int32 layer = 2;
+  int32 offset = 3;
+  repeated float category = 4;
+  repeated float target = 5;
+  string error_message = 6;
+}
+
+enum TaskStatus {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_SUCCESS = 1;
+  STATUS_FAILURE = 2;
+  STATUS_PENDING = 3;
+  STATUS_PROCESSING = 4;
 }

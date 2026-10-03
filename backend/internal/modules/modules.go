@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"audio-inference-service/internal/chunks"
 	"audio-inference-service/internal/domain"
 	"audio-inference-service/internal/modules/catalog"
 	"context"
@@ -10,14 +9,14 @@ import (
 // TaskManager - реализация должна уметь работать с задачами в бд, операции соответствуют методам
 type TaskManager interface {
 	// GetTask - получить задачу: её статус и результат инференса, если он уже сохранён
-	GetTask(ctx context.Context, taskID domain.Task, username domain.Username) (*domain.TaskResult, error)
+	GetTask(ctx context.Context, taskID domain.TaskID, username domain.Username) (*domain.Task, error)
 	// GetHistory - получить всю историю запросов
-	GetHistory(ctx context.Context, username domain.Username) ([]*chunks.FileInferenceResult, error)
+	GetHistory(ctx context.Context, username domain.Username) ([]*domain.FileInferenceResult, error)
 	// DeleteHistory - очистить всю историю запросов
 	DeleteHistory(ctx context.Context, username domain.Username) error
 
 	// CreateTask - создать задачу, то есть создать в бд строку со статусом pending
-	CreateTask(ctx context.Context, username domain.Username, taskID domain.Task, payload domain.AudioTaskPayload) error
+	CreateTask(ctx context.Context, username domain.Username, taskID domain.TaskID, payload domain.AudioTaskPayload) error
 
 	// GetAndMarkProcessing берет строки из бд, меняет в них поле статус на processing или берет строки со статусом
 	// processing если были. Они будут уже processing, если что-то упало (и не дошло до failure статуса)
@@ -25,12 +24,12 @@ type TaskManager interface {
 
 	// StatusSuccess и StatusFailure - cтатусы выполнения задач, успешно и с ошибкой соответственно.
 	// StatusFailure сохраняет частичный результат, если он успел собраться
-	StatusSuccess(ctx context.Context, taskID domain.Task, result *chunks.FileInferenceResult) error
-	StatusFailure(ctx context.Context, taskID domain.Task, result *chunks.FileInferenceResult) error
+	StatusSuccess(ctx context.Context, taskID domain.TaskID, result *domain.FileInferenceResult) error
+	StatusFailure(ctx context.Context, taskID domain.TaskID, result *domain.FileInferenceResult) error
 
 	// IncrementTaskError увеличивает счетчик ошибок.
 	// Если лимит исчерпан, переводит задачу в 'failure', иначе возвращает в 'pending'
-	IncrementTaskError(ctx context.Context, taskID domain.Task) error
+	IncrementTaskError(ctx context.Context, taskID domain.TaskID) error
 }
 
 // FilePredictor - реализация должна уметь брать задачу, выполнять и записывать в бд (с TaskManager работать) результат и статус

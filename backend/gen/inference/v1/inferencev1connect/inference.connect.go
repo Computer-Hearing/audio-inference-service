@@ -36,11 +36,15 @@ const (
 	// InferenceServiceCreateTaskProcedure is the fully-qualified name of the InferenceService's
 	// CreateTask RPC.
 	InferenceServiceCreateTaskProcedure = "/inference.v1.api.InferenceService/CreateTask"
+	// InferenceServiceGetTaskProcedure is the fully-qualified name of the InferenceService's GetTask
+	// RPC.
+	InferenceServiceGetTaskProcedure = "/inference.v1.api.InferenceService/GetTask"
 )
 
 // InferenceServiceClient is a client for the inference.v1.api.InferenceService service.
 type InferenceServiceClient interface {
 	CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error)
+	GetTask(context.Context, *connect.Request[v1.GetTaskRequest]) (*connect.Response[v1.GetTaskResponse], error)
 }
 
 // NewInferenceServiceClient constructs a client for the inference.v1.api.InferenceService service.
@@ -60,12 +64,19 @@ func NewInferenceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(inferenceServiceMethods.ByName("CreateTask")),
 			connect.WithClientOptions(opts...),
 		),
+		getTask: connect.NewClient[v1.GetTaskRequest, v1.GetTaskResponse](
+			httpClient,
+			baseURL+InferenceServiceGetTaskProcedure,
+			connect.WithSchema(inferenceServiceMethods.ByName("GetTask")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // inferenceServiceClient implements InferenceServiceClient.
 type inferenceServiceClient struct {
 	createTask *connect.Client[v1.CreateTaskRequest, v1.CreateTaskResponse]
+	getTask    *connect.Client[v1.GetTaskRequest, v1.GetTaskResponse]
 }
 
 // CreateTask calls inference.v1.api.InferenceService.CreateTask.
@@ -73,9 +84,15 @@ func (c *inferenceServiceClient) CreateTask(ctx context.Context, req *connect.Re
 	return c.createTask.CallUnary(ctx, req)
 }
 
+// GetTask calls inference.v1.api.InferenceService.GetTask.
+func (c *inferenceServiceClient) GetTask(ctx context.Context, req *connect.Request[v1.GetTaskRequest]) (*connect.Response[v1.GetTaskResponse], error) {
+	return c.getTask.CallUnary(ctx, req)
+}
+
 // InferenceServiceHandler is an implementation of the inference.v1.api.InferenceService service.
 type InferenceServiceHandler interface {
 	CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error)
+	GetTask(context.Context, *connect.Request[v1.GetTaskRequest]) (*connect.Response[v1.GetTaskResponse], error)
 }
 
 // NewInferenceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -91,10 +108,18 @@ func NewInferenceServiceHandler(svc InferenceServiceHandler, opts ...connect.Han
 		connect.WithSchema(inferenceServiceMethods.ByName("CreateTask")),
 		connect.WithHandlerOptions(opts...),
 	)
+	inferenceServiceGetTaskHandler := connect.NewUnaryHandler(
+		InferenceServiceGetTaskProcedure,
+		svc.GetTask,
+		connect.WithSchema(inferenceServiceMethods.ByName("GetTask")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/inference.v1.api.InferenceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case InferenceServiceCreateTaskProcedure:
 			inferenceServiceCreateTaskHandler.ServeHTTP(w, r)
+		case InferenceServiceGetTaskProcedure:
+			inferenceServiceGetTaskHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -106,4 +131,8 @@ type UnimplementedInferenceServiceHandler struct{}
 
 func (UnimplementedInferenceServiceHandler) CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("inference.v1.api.InferenceService.CreateTask is not implemented"))
+}
+
+func (UnimplementedInferenceServiceHandler) GetTask(context.Context, *connect.Request[v1.GetTaskRequest]) (*connect.Response[v1.GetTaskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("inference.v1.api.InferenceService.GetTask is not implemented"))
 }

@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"audio-inference-service/internal/chunks"
 	"audio-inference-service/internal/domain"
 	"audio-inference-service/internal/middleware"
 	"audio-inference-service/internal/modules"
+	"audio-inference-service/internal/modules/audio"
 	"audio-inference-service/pkg"
 	"os"
 
@@ -66,14 +66,7 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	taskID := domain.GenerateTaskID(username.String())
 
 	// получаем чанки - раздробленный звуковой файл на несколько по две секунды, переведенные в байты
-	ch, err := chunks.ChunksFromRequest(r)
-	if err != nil {
-		h.handleError(w, err)
-		return
-	}
-
-	// Получаем спектрограмму звуковую, просто массив флоатов, то есть для нас это столбики, чтобы красиво отрисовать звук
-	waves, err := chunks.AudioWaveFromRequest(r)
+	ch, err := audio.ChunksFromRequest(r)
 	if err != nil {
 		h.handleError(w, err)
 		return
@@ -83,7 +76,6 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	payload := domain.AudioTaskPayload{
 		ModelName: modelName,
 		Chunks:    *ch,
-		Wave:      waves,
 	}
 	if err := h.taskLoader.CreateTask(r.Context(), username, taskID, payload); err != nil {
 		h.handleError(w, err)
@@ -91,7 +83,7 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Отдаем ответ
-	pkg.SendJSON(h.logger, w, domain.TaskResponse{TaskID: taskID, Waves: waves, Model: modelName}, http.StatusCreated)
+	pkg.SendJSON(h.logger, w, domain.Task{TaskID: taskID, Model: modelName, Status: 3}, http.StatusCreated)
 }
 
 func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +103,7 @@ func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.taskLoader.GetTask(r.Context(), domain.Task(taskID), username)
+	task, err := h.taskLoader.GetTask(r.Context(), domain.TaskID(taskID), username)
 	if err != nil {
 		h.handleError(w, err)
 		return

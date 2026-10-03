@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { CreateTaskRequest, CreateTaskResponse } from "./inference_pb.js";
+import { CreateTaskRequest, CreateTaskResponse, GetTaskRequest, GetTaskResponse } from "./inference_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -19,6 +19,15 @@ export const InferenceService = {
       name: "CreateTask",
       I: CreateTaskRequest,
       O: CreateTaskResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc inference.v1.api.InferenceService.GetTask
+     */
+    getTask: {
+      name: "GetTask",
+      I: GetTaskRequest,
+      O: GetTaskResponse,
       kind: MethodKind.Unary,
     },
   }

@@ -2,9 +2,9 @@ package predictor
 
 import (
 	"audio-inference-service/gen"
-	"audio-inference-service/internal/chunks"
 	"audio-inference-service/internal/domain"
 	"audio-inference-service/internal/modules"
+	"audio-inference-service/internal/modules/audio"
 	"audio-inference-service/internal/modules/triton"
 	"audio-inference-service/pkg"
 	"context"
@@ -51,14 +51,14 @@ func processAudioChunks(
 	ctx context.Context,
 	client *triton.TritonClient,
 	modelName string,
-	audio chunks.AudioChunks) (*chunks.FileInferenceResult, error) {
+	audio audio.AudioChunks) (*domain.FileInferenceResult, error) {
 
 	total := 0
 	for _, layer := range audio.Layers {
 		total += len(layer.Chunks)
 	}
 
-	results := make([]chunks.ChunkResult, total)
+	results := make([]domain.ChunkResult, total)
 	g, ctx := errgroup.WithContext(ctx)
 	sem := make(chan struct{}, pkg.MaxTritonConcurrency)
 
@@ -80,7 +80,7 @@ func processAudioChunks(
 		return nil, fmt.Errorf("unexpected error during chunk processing: %w", err)
 	}
 
-	return &chunks.FileInferenceResult{
+	return &domain.FileInferenceResult{
 		Filename: audio.Filename,
 		Chunks:   results,
 	}, nil
@@ -88,10 +88,10 @@ func processAudioChunks(
 }
 
 // processChunk отправляет один чанк в Triton
-func processChunk(ctx context.Context, client *triton.TritonClient, modelName string, offset, layer, index int, chunk []byte) chunks.ChunkResult {
+func processChunk(ctx context.Context, client *triton.TritonClient, modelName string, offset, layer, index int, chunk []byte) domain.ChunkResult {
 	result, err := runRawAudioInference(ctx, client, modelName, chunk)
 	if err != nil {
-		return chunks.ChunkResult{
+		return domain.ChunkResult{
 			ChunkIndex:   index,
 			Layer:        layer,
 			Offset:       offset,
@@ -100,7 +100,7 @@ func processChunk(ctx context.Context, client *triton.TritonClient, modelName st
 		}
 	}
 
-	return chunks.ChunkResult{
+	return domain.ChunkResult{
 		ChunkIndex: index,
 		Layer:      layer,
 		Offset:     offset,
@@ -114,7 +114,7 @@ func runRawAudioInference(
 	ctx context.Context,
 	client *triton.TritonClient,
 	modelName string,
-	chunk []byte) (*chunks.InferenceResult, error) {
+	chunk []byte) (*domain.InferenceResult, error) {
 
 	req := &gen.ModelInferRequest{
 		ModelName: modelName,
@@ -140,8 +140,8 @@ func runRawAudioInference(
 	return parseResponse(resp)
 }
 
-func parseResponse(resp *gen.ModelInferResponse) (*chunks.InferenceResult, error) {
-	result := &chunks.InferenceResult{}
+func parseResponse(resp *gen.ModelInferResponse) (*domain.InferenceResult, error) {
+	result := &domain.InferenceResult{}
 
 	for i, out := range resp.Outputs {
 
