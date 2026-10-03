@@ -66,7 +66,7 @@ func main() {
 	// Запускаем воркеры и диспетчера задач
 	taskpipe.StartPipeline(ctx, taskManager, predict)
 
-	modelCatalog := catalog.NewTritonCatalog(tritonClient, 30*time.Second)
+	modelCatalog := catalog.New(tritonClient, 30*time.Second)
 	handlers := handlers.New(handlers.Options{
 		TaskLoader: taskManager, Catalog: modelCatalog, Models: taskManager, Logger: logger,
 	})
