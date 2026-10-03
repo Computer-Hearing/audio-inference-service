@@ -2,7 +2,7 @@ package router
 
 import (
 	"audio-inference-service/internal/middleware"
-	"audio-inference-service/internal/server/handlers"
+	"audio-inference-service/internal/server/rest/handlers"
 	"fmt"
 	"log/slog"
 	"net/http"

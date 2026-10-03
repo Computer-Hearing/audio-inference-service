@@ -13,10 +13,14 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@bufbuild/protobuf": "^2.16.0",
+    "@connectrpc/connect": "^2.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@bufbuild/protoc-gen-es": "^2.16.0",
+    "@connectrpc/protoc-gen-connect-es": "^1.7.0",
     "@vitejs/plugin-react": "^6.0.5",
     "vite": "^8.2.1"
   }

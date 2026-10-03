@@ -1,0 +1,14 @@
+version: v2
+inputs:
+  - directory: .
+    paths:
+      - inference/v1
+plugins:
+  - local: protoc-gen-es
+    out: ../frontend/src/gen
+    opt:
+      - target=js
+  - local: protoc-gen-connect-es
+    out: ../frontend/src/gen
+    opt:
+      - target=js

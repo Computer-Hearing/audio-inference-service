@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package inference.v1.api;
+
+option go_package = "audio-inference-service/gen/inference/v1;inferencev1";
+
+service InferenceService {
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+}
+
+message CreateTaskRequest {
+  bytes audio_file = 1;
+  string model_name = 2;
+}
+
+message CreateTaskResponse {
+  int32 id = 1;
+  string name = 2;
+}

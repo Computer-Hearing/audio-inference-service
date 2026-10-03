@@ -14,6 +14,7 @@ require (
 )
 
 require (
+	connectrpc.com/connect v1.21.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
