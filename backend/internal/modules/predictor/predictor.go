@@ -10,8 +10,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"math"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type Predictor struct {
@@ -22,13 +23,13 @@ type Predictor struct {
 func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) error {
 	modelName := job.Payload.ModelName
 	if modelName == "" {
-		modelName = pkg.DefaultModelName
+		return fmt.Errorf("model name is required")
 	}
 
-	// База данных свободна, пока мы делаем долгий сетевой запрос к Тритону
+	// сам inference
 	result, inferErr := processAudioChunks(ctx, p.TritonConnector, modelName, job.Payload.Chunks)
 
-	// Обновляем статус в БД короткими транзакциями
+	// Обновляем статус в БД
 	err := pkg.RetryDo(ctx, nil, func(ctx context.Context) error {
 		if inferErr != nil {
 			return p.TaskManager.StatusFailure(ctx, job.TaskID, result)
@@ -53,6 +54,7 @@ func processAudioChunks(
 	modelName string,
 	audio audio.AudioChunks) (*domain.FileInferenceResult, error) {
 
+	// сколько всего чанков у нас из слоев
 	total := 0
 	for _, layer := range audio.Layers {
 		total += len(layer.Chunks)
@@ -60,6 +62,7 @@ func processAudioChunks(
 
 	results := make([]domain.ChunkResult, total)
 	g, ctx := errgroup.WithContext(ctx)
+	// ограничиваем количество параллельных запросов
 	sem := make(chan struct{}, pkg.MaxTritonConcurrency)
 
 	next := 0
@@ -88,7 +91,10 @@ func processAudioChunks(
 }
 
 // processChunk отправляет один чанк в Triton
-func processChunk(ctx context.Context, client *triton.TritonClient, modelName string, offset, layer, index int, chunk []byte) domain.ChunkResult {
+func processChunk(
+	ctx context.Context, client *triton.TritonClient,
+	modelName string, offset, layer, index int, chunk []byte) domain.ChunkResult {
+
 	result, err := runRawAudioInference(ctx, client, modelName, chunk)
 	if err != nil {
 		return domain.ChunkResult{
