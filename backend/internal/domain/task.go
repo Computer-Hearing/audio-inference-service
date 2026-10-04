@@ -2,8 +2,10 @@ package domain
 
 import (
 	"audio-inference-service/internal/modules/audio"
+	"audio-inference-service/pkg"
 	"crypto/md5"
 	"fmt"
+	"net/http"
 
 	"github.com/google/uuid"
 )
@@ -20,11 +22,14 @@ type Task struct {
 
 type TaskID string
 
-func (t TaskID) String() string {
-	return string(t)
+func (t TaskID) IsValid() error {
+	if t == "" {
+		return pkg.APIError{Message: "taskID is empty", StatusCode: http.StatusBadRequest}
+	}
+	return nil
 }
 
-// GenerateTaskID - генерирует айди задачи
+// GenerateTaskID - генерирует новое айди задачи
 func GenerateTaskID(userName string) TaskID {
 	return TaskID(fmt.Sprintf("%x", md5.Sum([]byte(userName+uuid.NewString()))))
 }

@@ -16,18 +16,15 @@ type SqliteTaskManager struct {
 	db *sql.DB
 }
 
-func NewSQLiteTaskManager(db *sql.DB) *SqliteTaskManager {
+func New(db *sql.DB) *SqliteTaskManager {
 	return &SqliteTaskManager{db: db}
 }
 
-func (m *SqliteTaskManager) GetTask(ctx context.Context, taskID domain.TaskID,
-	username domain.Username) (*domain.Task, error) {
-	if string(taskID) == "" {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Validation failed",
-			Details:    map[string]string{"taskID": "cannot be empty"},
-		}
+func (m *SqliteTaskManager) GetTask(
+	ctx context.Context, taskID domain.TaskID, username domain.Username) (*domain.Task, error) {
+
+	if err := taskID.IsValid(); err != nil {
+		return nil, err
 	}
 
 	var (
@@ -70,17 +67,13 @@ func (m *SqliteTaskManager) GetTask(ctx context.Context, taskID domain.TaskID,
 		}
 		taskResult.Result = &res
 	}
-
+	// TODO: проверка, что если статус success и json нет, то что-то не так
 	return taskResult, nil
 }
 
 func (m *SqliteTaskManager) GetHistory(ctx context.Context, username domain.Username) ([]*domain.FileInferenceResult, error) {
-	if string(username) == "" {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Validation failed",
-			Details:    map[string]string{"username": "cannot be empty"},
-		}
+	if err := username.IsValid(); err != nil {
+		return nil, err
 	}
 
 	query := `SELECT result FROM tasks WHERE username = ? AND status = ? ORDER BY created_at DESC`
@@ -130,12 +123,8 @@ func (m *SqliteTaskManager) GetHistory(ctx context.Context, username domain.User
 }
 
 func (m *SqliteTaskManager) DeleteHistory(ctx context.Context, username domain.Username) error {
-	if string(username) == "" {
-		return pkg.APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Validation failed",
-			Details:    map[string]string{"username": "cannot be empty"},
-		}
+	if err := username.IsValid(); err != nil {
+		return err
 	}
 
 	query := `DELETE FROM tasks WHERE username = ?`
@@ -155,6 +144,7 @@ func (m *SqliteTaskManager) CreateTask(
 	ctx context.Context, username domain.Username,
 	taskID domain.TaskID, payload domain.AudioTaskPayload) error {
 	// Валидация всех полей
+	// TODO: в pkg.errors добавить, чтобы можно было ошибку множественной делать и мапа расширялась для ошибок в одну
 	details := make(map[string]string)
 	if string(username) == "" {
 		details["username"] = "cannot be empty"
@@ -171,7 +161,7 @@ func (m *SqliteTaskManager) CreateTask(
 	if len(details) > 0 {
 		return pkg.APIError{
 			StatusCode: http.StatusBadRequest,
-			Message:    "Validation failed for task creation",
+			Message:    "create task validation failed",
 			Details:    details,
 		}
 	}
@@ -180,7 +170,7 @@ func (m *SqliteTaskManager) CreateTask(
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to marshal audio chunks",
+			Message:    "marshal audio chunks failed",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -198,7 +188,7 @@ func (m *SqliteTaskManager) CreateTask(
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while inserting task",
+			Message:    "create task error",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -210,7 +200,7 @@ func (m *SqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 	if limit <= 0 {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusBadRequest,
-			Message:    "Validation failed",
+			Message:    "tasks limit validation failed",
 			Details:    map[string]string{"limit": "must be greater than 0"},
 		}
 	}
@@ -240,7 +230,7 @@ func (m *SqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 	if err != nil {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while fetching tasks for processing",
+			Message:    "error while fetching tasks",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -253,14 +243,14 @@ func (m *SqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 		if err := rows.Scan(&taskID, &chunksJSON, &model); err != nil {
 			return nil, pkg.APIError{
 				StatusCode: http.StatusInternalServerError,
-				Message:    "Database error while scanning processing task payload",
+				Message:    "error while scanning task payload",
 				Details:    map[string]string{"error": err.Error()},
 			}
 		}
 
 		var c audio.AudioChunks
 		if err := json.Unmarshal([]byte(chunksJSON), &c); err != nil {
-			// Локализуем ошибку: помечаем конкретную задачу битой и идем к следующей
+			// Локализуем ошибку. Типо помечаем конкретную задачу битой и идем к следующей
 			_ = m.IncrementTaskError(ctx, domain.TaskID(taskID))
 			continue
 		}
@@ -298,7 +288,7 @@ func (m *SqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Tas
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Failed to marshal result data",
+			Message:    "marshal result data error",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -315,7 +305,7 @@ func (m *SqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Tas
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while setting status success",
+			Message:    "set status error",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -357,7 +347,7 @@ func (m *SqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Tas
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while setting status failure",
+			Message:    "set status error",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -393,7 +383,7 @@ func (m *SqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domai
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while incrementing task error",
+			Message:    "increment task error",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -414,7 +404,7 @@ func (m *SqliteTaskManager) GetModels(ctx context.Context) (map[string]domain.Mo
 	if err != nil {
 		return nil, pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while getting models",
+			Message:    "get models error",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -429,7 +419,7 @@ func (m *SqliteTaskManager) GetModels(ctx context.Context) (map[string]domain.Mo
 		if err != nil {
 			return nil, pkg.APIError{
 				StatusCode: http.StatusInternalServerError,
-				Message:    "Database error while scanning model",
+				Message:    "scan models error",
 				Details:    map[string]string{"error": err.Error()},
 			}
 		}
@@ -462,7 +452,7 @@ func (m *SqliteTaskManager) DeleteModelByName(ctx context.Context, modelName str
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while deleting model",
+			Message:    "delete model error",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}
@@ -489,7 +479,7 @@ func (m *SqliteTaskManager) UpsertModel(ctx context.Context, model domain.Model)
 	if err != nil {
 		return pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while upsert model",
+			Message:    "upsert model error",
 			Details:    map[string]string{"error": err.Error()},
 		}
 	}

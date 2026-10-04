@@ -57,7 +57,7 @@ func main() {
 	}
 	logger.Info("connected to triton", "addr", cfg.TritonAddr)
 
-	taskManager := sqlite.NewSQLiteTaskManager(db)
+	taskManager := sqlite.New(db)
 	predict := &predictor.Predictor{
 		TritonConnector: tritonClient,
 		TaskManager:     taskManager,

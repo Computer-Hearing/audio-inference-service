@@ -1,3 +1,5 @@
+//go:build rest
+
 package handlers
 
 import (
