@@ -79,7 +79,8 @@ func (TaskStatus) EnumDescriptor() ([]byte, []int) {
 type CreateTaskRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AudioFile     []byte                 `protobuf:"bytes,1,opt,name=audio_file,json=audioFile,proto3" json:"audio_file,omitempty"`
-	ModelName     string                 `protobuf:"bytes,2,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	Filename      string                 `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
+	ModelName     string                 `protobuf:"bytes,3,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -119,6 +120,13 @@ func (x *CreateTaskRequest) GetAudioFile() []byte {
 		return x.AudioFile
 	}
 	return nil
+}
+
+func (x *CreateTaskRequest) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
 }
 
 func (x *CreateTaskRequest) GetModelName() string {
@@ -260,14 +268,12 @@ func (x *GetTaskResponse) GetTask() *Task {
 	return nil
 }
 
-// Task - задача от момента постановки в очередь ('pending') до завершения
-// ('success'/'failure'). Поле result заполняется только при успешном исходе.
 type Task struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
 	Status        TaskStatus             `protobuf:"varint,2,opt,name=status,proto3,enum=inference.v1.api.TaskStatus" json:"status,omitempty"`
 	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	Result        *Result                `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
+	Result        *TaskResult            `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -323,14 +329,14 @@ func (x *Task) GetModel() string {
 	return ""
 }
 
-func (x *Task) GetResult() *Result {
+func (x *Task) GetResult() *TaskResult {
 	if x != nil {
 		return x.Result
 	}
 	return nil
 }
 
-type Result struct {
+type TaskResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Filename      string                 `protobuf:"bytes,1,opt,name=filename,proto3" json:"filename,omitempty"`
 	Chunks        []*Chunk               `protobuf:"bytes,2,rep,name=chunks,proto3" json:"chunks,omitempty"`
@@ -338,20 +344,20 @@ type Result struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Result) Reset() {
-	*x = Result{}
+func (x *TaskResult) Reset() {
+	*x = TaskResult{}
 	mi := &file_inference_v1_inference_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Result) String() string {
+func (x *TaskResult) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Result) ProtoMessage() {}
+func (*TaskResult) ProtoMessage() {}
 
-func (x *Result) ProtoReflect() protoreflect.Message {
+func (x *TaskResult) ProtoReflect() protoreflect.Message {
 	mi := &file_inference_v1_inference_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -363,19 +369,19 @@ func (x *Result) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Result.ProtoReflect.Descriptor instead.
-func (*Result) Descriptor() ([]byte, []int) {
+// Deprecated: Use TaskResult.ProtoReflect.Descriptor instead.
+func (*TaskResult) Descriptor() ([]byte, []int) {
 	return file_inference_v1_inference_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *Result) GetFilename() string {
+func (x *TaskResult) GetFilename() string {
 	if x != nil {
 		return x.Filename
 	}
 	return ""
 }
 
-func (x *Result) GetChunks() []*Chunk {
+func (x *TaskResult) GetChunks() []*Chunk {
 	if x != nil {
 		return x.Chunks
 	}
@@ -470,24 +476,26 @@ var File_inference_v1_inference_proto protoreflect.FileDescriptor
 
 const file_inference_v1_inference_proto_rawDesc = "" +
 	"\n" +
-	"\x1cinference/v1/inference.proto\x12\x10inference.v1.api\"Q\n" +
+	"\x1cinference/v1/inference.proto\x12\x10inference.v1.api\"m\n" +
 	"\x11CreateTaskRequest\x12\x1d\n" +
 	"\n" +
-	"audio_file\x18\x01 \x01(\fR\taudioFile\x12\x1d\n" +
+	"audio_file\x18\x01 \x01(\fR\taudioFile\x12\x1a\n" +
+	"\bfilename\x18\x02 \x01(\tR\bfilename\x12\x1d\n" +
 	"\n" +
-	"model_name\x18\x02 \x01(\tR\tmodelName\"@\n" +
+	"model_name\x18\x03 \x01(\tR\tmodelName\"@\n" +
 	"\x12CreateTaskResponse\x12*\n" +
 	"\x04task\x18\x01 \x01(\v2\x16.inference.v1.api.TaskR\x04task\")\n" +
 	"\x0eGetTaskRequest\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\"=\n" +
 	"\x0fGetTaskResponse\x12*\n" +
-	"\x04task\x18\x01 \x01(\v2\x16.inference.v1.api.TaskR\x04task\"\x9d\x01\n" +
+	"\x04task\x18\x01 \x01(\v2\x16.inference.v1.api.TaskR\x04task\"\xa1\x01\n" +
 	"\x04Task\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x124\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x1c.inference.v1.api.TaskStatusR\x06status\x12\x14\n" +
-	"\x05model\x18\x03 \x01(\tR\x05model\x120\n" +
-	"\x06result\x18\x04 \x01(\v2\x18.inference.v1.api.ResultR\x06result\"U\n" +
-	"\x06Result\x12\x1a\n" +
+	"\x05model\x18\x03 \x01(\tR\x05model\x124\n" +
+	"\x06result\x18\x04 \x01(\v2\x1c.inference.v1.api.TaskResultR\x06result\"Y\n" +
+	"\n" +
+	"TaskResult\x12\x1a\n" +
 	"\bfilename\x18\x01 \x01(\tR\bfilename\x12/\n" +
 	"\x06chunks\x18\x02 \x03(\v2\x17.inference.v1.api.ChunkR\x06chunks\"\xaf\x01\n" +
 	"\x05Chunk\x12\x1f\n" +
@@ -531,15 +539,15 @@ var file_inference_v1_inference_proto_goTypes = []any{
 	(*GetTaskRequest)(nil),     // 3: inference.v1.api.GetTaskRequest
 	(*GetTaskResponse)(nil),    // 4: inference.v1.api.GetTaskResponse
 	(*Task)(nil),               // 5: inference.v1.api.Task
-	(*Result)(nil),             // 6: inference.v1.api.Result
+	(*TaskResult)(nil),         // 6: inference.v1.api.TaskResult
 	(*Chunk)(nil),              // 7: inference.v1.api.Chunk
 }
 var file_inference_v1_inference_proto_depIdxs = []int32{
 	5, // 0: inference.v1.api.CreateTaskResponse.task:type_name -> inference.v1.api.Task
 	5, // 1: inference.v1.api.GetTaskResponse.task:type_name -> inference.v1.api.Task
 	0, // 2: inference.v1.api.Task.status:type_name -> inference.v1.api.TaskStatus
-	6, // 3: inference.v1.api.Task.result:type_name -> inference.v1.api.Result
-	7, // 4: inference.v1.api.Result.chunks:type_name -> inference.v1.api.Chunk
+	6, // 3: inference.v1.api.Task.result:type_name -> inference.v1.api.TaskResult
+	7, // 4: inference.v1.api.TaskResult.chunks:type_name -> inference.v1.api.Chunk
 	1, // 5: inference.v1.api.InferenceService.CreateTask:input_type -> inference.v1.api.CreateTaskRequest
 	3, // 6: inference.v1.api.InferenceService.GetTask:input_type -> inference.v1.api.GetTaskRequest
 	2, // 7: inference.v1.api.InferenceService.CreateTask:output_type -> inference.v1.api.CreateTaskResponse
