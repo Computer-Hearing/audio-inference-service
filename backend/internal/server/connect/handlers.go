@@ -6,6 +6,7 @@ import (
 	"audio-inference-service/internal/domain"
 	"audio-inference-service/internal/modules"
 	"audio-inference-service/internal/modules/audio"
+	"audio-inference-service/internal/modules/models"
 	"audio-inference-service/internal/server/connect/dto"
 	"audio-inference-service/pkg"
 	"context"
@@ -17,19 +18,21 @@ import (
 )
 
 type Handlers struct {
-	taskLoader modules.TaskManager
-	catalog    modules.Catalog
-	logger     *slog.Logger
+	taskLoader   modules.TaskManager
+	catalog      modules.Catalog
+	modelStorage *models.Storage
+	logger       *slog.Logger
 }
 
 type Options struct {
-	TaskLoader modules.TaskManager
-	Catalog    modules.Catalog
-	Logger     *slog.Logger
+	TaskLoader   modules.TaskManager
+	Catalog      modules.Catalog
+	ModelStorage *models.Storage
+	Logger       *slog.Logger
 }
 
-func New(opts Options) *Handlers {
-	return &Handlers{taskLoader: opts.TaskLoader, catalog: opts.Catalog, logger: opts.Logger}
+func New(opts *Options) *Handlers {
+	return &Handlers{taskLoader: opts.TaskLoader, catalog: opts.Catalog, logger: opts.Logger, modelStorage: opts.ModelStorage}
 }
 
 var _ inferencev1connect.InferenceServiceClient = (*Handlers)(nil)
@@ -62,17 +65,26 @@ func (h Handlers) CreateTask(
 		// Модели нет в тритон
 		return nil, pkg.APIError{
 			StatusCode: http.StatusInternalServerError,
-			Message:    fmt.Sprintf("unknown or unsupported model: %s", c.Msg.ModelName),
+			Message:    fmt.Sprintf("triton: unknown or unsupported model: %s", c.Msg.ModelName),
 		}
 	}
 
 	// генерируем таск id
 	taskID := domain.GenerateTaskID(username.String())
+	h.logger.Info("models", slog.Any("slice", h.modelStorage.Names()))
+	modelConfig, ok := h.modelStorage.Get(c.Msg.ModelName)
+	if !ok {
+		return nil, pkg.APIError{
+			StatusCode: http.StatusInternalServerError,
+			Message:    fmt.Sprintf("storage: unknown or unsupported model: %s", c.Msg.ModelName),
+		}
+	}
 
 	// получаем чанки
 	ch, err := audio.Split(audio.Options{
-		Data:     c.Msg.AudioFile,
-		Filename: c.Msg.Filename,
+		Data:            c.Msg.AudioFile,
+		Filename:        c.Msg.Filename,
+		SecondsPerChunk: modelConfig.SecondsPerChunk,
 	})
 	if err != nil {
 		return nil, err

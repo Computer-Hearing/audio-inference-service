@@ -59,15 +59,15 @@ func (s *Syncer) refresh(ctx context.Context) error {
 
 	fresh := make(map[string]ModelConfig, len(infos))
 	for _, m := range infos {
-		name, spc, ok := ParseModelName(m.Name)
+		_, spc, ok := ParseModelName(m.Name)
 		if !ok {
 			s.logger.Debug("skipping model with invalid name", "name", m.Name)
 			continue
 		}
 
 		cfg := ModelConfig{
-			Name:               name,
-			ProjectTitle:       fmt.Sprintf("Project for %s", name),
+			Name:               m.Name,
+			ProjectTitle:       fmt.Sprintf("Project for %s", m.Name),
 			SecondsPerChunk:    spc,
 			TargetClassesNum:   outputLen(m, pkg.TargetOutputName),
 			CategoryClassesNum: outputLen(m, pkg.CategoryOutputName),
@@ -76,12 +76,12 @@ func (s *Syncer) refresh(ctx context.Context) error {
 		}
 
 		// Если модель уже есть — сохраняем ручные правки title/description
-		if old, ok := s.storage.Get(name); ok {
+		if old, ok := s.storage.Get(m.Name); ok {
 			cfg.ProjectTitle = old.ProjectTitle
 			cfg.ProjectDescription = old.ProjectDescription
 		}
 
-		fresh[name] = cfg
+		fresh[m.Name] = cfg
 	}
 	s.storage.ReplaceAll(fresh)
 	s.logger.Info("models synced", "count", len(fresh))

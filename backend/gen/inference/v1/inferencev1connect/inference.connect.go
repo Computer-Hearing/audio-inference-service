@@ -33,6 +33,9 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// InferenceServiceRegisterProcedure is the fully-qualified name of the InferenceService's Register
+	// RPC.
+	InferenceServiceRegisterProcedure = "/inference.v1.api.InferenceService/Register"
 	// InferenceServiceCreateTaskProcedure is the fully-qualified name of the InferenceService's
 	// CreateTask RPC.
 	InferenceServiceCreateTaskProcedure = "/inference.v1.api.InferenceService/CreateTask"
@@ -43,6 +46,7 @@ const (
 
 // InferenceServiceClient is a client for the inference.v1.api.InferenceService service.
 type InferenceServiceClient interface {
+	Register(context.Context, *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error)
 	CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error)
 	GetTask(context.Context, *connect.Request[v1.GetTaskRequest]) (*connect.Response[v1.GetTaskResponse], error)
 }
@@ -58,6 +62,12 @@ func NewInferenceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 	baseURL = strings.TrimRight(baseURL, "/")
 	inferenceServiceMethods := v1.File_inference_v1_inference_proto.Services().ByName("InferenceService").Methods()
 	return &inferenceServiceClient{
+		register: connect.NewClient[v1.RegisterRequest, v1.RegisterResponse](
+			httpClient,
+			baseURL+InferenceServiceRegisterProcedure,
+			connect.WithSchema(inferenceServiceMethods.ByName("Register")),
+			connect.WithClientOptions(opts...),
+		),
 		createTask: connect.NewClient[v1.CreateTaskRequest, v1.CreateTaskResponse](
 			httpClient,
 			baseURL+InferenceServiceCreateTaskProcedure,
@@ -75,8 +85,14 @@ func NewInferenceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 
 // inferenceServiceClient implements InferenceServiceClient.
 type inferenceServiceClient struct {
+	register   *connect.Client[v1.RegisterRequest, v1.RegisterResponse]
 	createTask *connect.Client[v1.CreateTaskRequest, v1.CreateTaskResponse]
 	getTask    *connect.Client[v1.GetTaskRequest, v1.GetTaskResponse]
+}
+
+// Register calls inference.v1.api.InferenceService.Register.
+func (c *inferenceServiceClient) Register(ctx context.Context, req *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error) {
+	return c.register.CallUnary(ctx, req)
 }
 
 // CreateTask calls inference.v1.api.InferenceService.CreateTask.
@@ -91,6 +107,7 @@ func (c *inferenceServiceClient) GetTask(ctx context.Context, req *connect.Reque
 
 // InferenceServiceHandler is an implementation of the inference.v1.api.InferenceService service.
 type InferenceServiceHandler interface {
+	Register(context.Context, *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error)
 	CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error)
 	GetTask(context.Context, *connect.Request[v1.GetTaskRequest]) (*connect.Response[v1.GetTaskResponse], error)
 }
@@ -102,6 +119,12 @@ type InferenceServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewInferenceServiceHandler(svc InferenceServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	inferenceServiceMethods := v1.File_inference_v1_inference_proto.Services().ByName("InferenceService").Methods()
+	inferenceServiceRegisterHandler := connect.NewUnaryHandler(
+		InferenceServiceRegisterProcedure,
+		svc.Register,
+		connect.WithSchema(inferenceServiceMethods.ByName("Register")),
+		connect.WithHandlerOptions(opts...),
+	)
 	inferenceServiceCreateTaskHandler := connect.NewUnaryHandler(
 		InferenceServiceCreateTaskProcedure,
 		svc.CreateTask,
@@ -116,6 +139,8 @@ func NewInferenceServiceHandler(svc InferenceServiceHandler, opts ...connect.Han
 	)
 	return "/inference.v1.api.InferenceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case InferenceServiceRegisterProcedure:
+			inferenceServiceRegisterHandler.ServeHTTP(w, r)
 		case InferenceServiceCreateTaskProcedure:
 			inferenceServiceCreateTaskHandler.ServeHTTP(w, r)
 		case InferenceServiceGetTaskProcedure:
@@ -128,6 +153,10 @@ func NewInferenceServiceHandler(svc InferenceServiceHandler, opts ...connect.Han
 
 // UnimplementedInferenceServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedInferenceServiceHandler struct{}
+
+func (UnimplementedInferenceServiceHandler) Register(context.Context, *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("inference.v1.api.InferenceService.Register is not implemented"))
+}
 
 func (UnimplementedInferenceServiceHandler) CreateTask(context.Context, *connect.Request[v1.CreateTaskRequest]) (*connect.Response[v1.CreateTaskResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("inference.v1.api.InferenceService.CreateTask is not implemented"))

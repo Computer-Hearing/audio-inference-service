@@ -4,6 +4,7 @@ import (
 	"audio-inference-service/gen/inference/v1/inferencev1connect"
 	"audio-inference-service/internal/config"
 	"audio-inference-service/internal/modules/catalog"
+	"audio-inference-service/internal/modules/models"
 	"audio-inference-service/internal/modules/predictor"
 	"audio-inference-service/internal/modules/sqlite"
 	"audio-inference-service/internal/modules/taskpipe"
@@ -59,6 +60,15 @@ func main() {
 	}
 	logger.Info("triton connect sucess", "addr", cfg.TritonAddr)
 
+	modelCatalog := catalog.New(tritonClient, 30*time.Second)
+
+	// хранение моделей
+	storage := models.NewStorage()
+	syncer := models.NewSyncer(storage, modelCatalog, 5*time.Second, logger)
+	go func() {
+		syncer.Run(ctx)
+	}()
+
 	taskManager := sqlite.New(db)
 	predict := predictor.New(&predictor.Options{
 		TritonConnector: tritonClient,
@@ -68,12 +78,11 @@ func main() {
 	// Запускаем воркеры и диспетчера задач
 	taskpipe.StartPipeline(ctx, taskManager, predict)
 
-	modelCatalog := catalog.New(tritonClient, 30*time.Second)
-
-	h := handlers.New(handlers.Options{
-		TaskLoader: taskManager,
-		Catalog:    modelCatalog,
-		Logger:     logger,
+	h := handlers.New(&handlers.Options{
+		TaskLoader:   taskManager,
+		Catalog:      modelCatalog,
+		ModelStorage: storage,
+		Logger:       logger,
 	})
 	path, connectHandler := inferencev1connect.NewInferenceServiceHandler(h,
 		connect.WithInterceptors(handlers.NewUsernameInterceptor()),
@@ -90,6 +99,7 @@ func main() {
 		WriteTimeout: 5 * time.Minute,
 		Protocols:    &http.Protocols{},
 	}
+	srv.Protocols.SetHTTP1(true)
 	srv.Protocols.SetUnencryptedHTTP2(true)
 
 	go func() {

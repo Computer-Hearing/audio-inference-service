@@ -76,6 +76,95 @@ func (TaskStatus) EnumDescriptor() ([]byte, []int) {
 	return file_inference_v1_inference_proto_rawDescGZIP(), []int{0}
 }
 
+// RegisterRequest запрашивает регистрацию. Пустой username — сгенерировать анонимный.
+type RegisterRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterRequest) Reset() {
+	*x = RegisterRequest{}
+	mi := &file_inference_v1_inference_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterRequest) ProtoMessage() {}
+
+func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_inference_v1_inference_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
+func (*RegisterRequest) Descriptor() ([]byte, []int) {
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *RegisterRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+type RegisterResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterResponse) Reset() {
+	*x = RegisterResponse{}
+	mi := &file_inference_v1_inference_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterResponse) ProtoMessage() {}
+
+func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_inference_v1_inference_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
+func (*RegisterResponse) Descriptor() ([]byte, []int) {
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *RegisterResponse) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
 type CreateTaskRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AudioFile     []byte                 `protobuf:"bytes,1,opt,name=audio_file,json=audioFile,proto3" json:"audio_file,omitempty"`
@@ -87,7 +176,7 @@ type CreateTaskRequest struct {
 
 func (x *CreateTaskRequest) Reset() {
 	*x = CreateTaskRequest{}
-	mi := &file_inference_v1_inference_proto_msgTypes[0]
+	mi := &file_inference_v1_inference_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -99,7 +188,7 @@ func (x *CreateTaskRequest) String() string {
 func (*CreateTaskRequest) ProtoMessage() {}
 
 func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[0]
+	mi := &file_inference_v1_inference_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -112,7 +201,7 @@ func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskRequest.ProtoReflect.Descriptor instead.
 func (*CreateTaskRequest) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{0}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateTaskRequest) GetAudioFile() []byte {
@@ -145,7 +234,7 @@ type CreateTaskResponse struct {
 
 func (x *CreateTaskResponse) Reset() {
 	*x = CreateTaskResponse{}
-	mi := &file_inference_v1_inference_proto_msgTypes[1]
+	mi := &file_inference_v1_inference_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -157,7 +246,7 @@ func (x *CreateTaskResponse) String() string {
 func (*CreateTaskResponse) ProtoMessage() {}
 
 func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[1]
+	mi := &file_inference_v1_inference_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -170,7 +259,7 @@ func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskResponse.ProtoReflect.Descriptor instead.
 func (*CreateTaskResponse) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{1}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateTaskResponse) GetTask() *Task {
@@ -189,7 +278,7 @@ type GetTaskRequest struct {
 
 func (x *GetTaskRequest) Reset() {
 	*x = GetTaskRequest{}
-	mi := &file_inference_v1_inference_proto_msgTypes[2]
+	mi := &file_inference_v1_inference_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -201,7 +290,7 @@ func (x *GetTaskRequest) String() string {
 func (*GetTaskRequest) ProtoMessage() {}
 
 func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[2]
+	mi := &file_inference_v1_inference_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -214,7 +303,7 @@ func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskRequest.ProtoReflect.Descriptor instead.
 func (*GetTaskRequest) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{2}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetTaskRequest) GetTaskId() string {
@@ -233,7 +322,7 @@ type GetTaskResponse struct {
 
 func (x *GetTaskResponse) Reset() {
 	*x = GetTaskResponse{}
-	mi := &file_inference_v1_inference_proto_msgTypes[3]
+	mi := &file_inference_v1_inference_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -245,7 +334,7 @@ func (x *GetTaskResponse) String() string {
 func (*GetTaskResponse) ProtoMessage() {}
 
 func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[3]
+	mi := &file_inference_v1_inference_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -258,7 +347,7 @@ func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskResponse.ProtoReflect.Descriptor instead.
 func (*GetTaskResponse) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{3}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetTaskResponse) GetTask() *Task {
@@ -280,7 +369,7 @@ type Task struct {
 
 func (x *Task) Reset() {
 	*x = Task{}
-	mi := &file_inference_v1_inference_proto_msgTypes[4]
+	mi := &file_inference_v1_inference_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -292,7 +381,7 @@ func (x *Task) String() string {
 func (*Task) ProtoMessage() {}
 
 func (x *Task) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[4]
+	mi := &file_inference_v1_inference_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -305,7 +394,7 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Task.ProtoReflect.Descriptor instead.
 func (*Task) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{4}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Task) GetTaskId() string {
@@ -346,7 +435,7 @@ type TaskResult struct {
 
 func (x *TaskResult) Reset() {
 	*x = TaskResult{}
-	mi := &file_inference_v1_inference_proto_msgTypes[5]
+	mi := &file_inference_v1_inference_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -358,7 +447,7 @@ func (x *TaskResult) String() string {
 func (*TaskResult) ProtoMessage() {}
 
 func (x *TaskResult) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[5]
+	mi := &file_inference_v1_inference_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -371,7 +460,7 @@ func (x *TaskResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskResult.ProtoReflect.Descriptor instead.
 func (*TaskResult) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{5}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TaskResult) GetFilename() string {
@@ -402,7 +491,7 @@ type Chunk struct {
 
 func (x *Chunk) Reset() {
 	*x = Chunk{}
-	mi := &file_inference_v1_inference_proto_msgTypes[6]
+	mi := &file_inference_v1_inference_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -414,7 +503,7 @@ func (x *Chunk) String() string {
 func (*Chunk) ProtoMessage() {}
 
 func (x *Chunk) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[6]
+	mi := &file_inference_v1_inference_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -427,7 +516,7 @@ func (x *Chunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Chunk.ProtoReflect.Descriptor instead.
 func (*Chunk) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{6}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Chunk) GetChunkIndex() int32 {
@@ -476,7 +565,11 @@ var File_inference_v1_inference_proto protoreflect.FileDescriptor
 
 const file_inference_v1_inference_proto_rawDesc = "" +
 	"\n" +
-	"\x1cinference/v1/inference.proto\x12\x10inference.v1.api\"m\n" +
+	"\x1cinference/v1/inference.proto\x12\x10inference.v1.api\"-\n" +
+	"\x0fRegisterRequest\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\".\n" +
+	"\x10RegisterResponse\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\"m\n" +
 	"\x11CreateTaskRequest\x12\x1d\n" +
 	"\n" +
 	"audio_file\x18\x01 \x01(\fR\taudioFile\x12\x1a\n" +
@@ -512,8 +605,9 @@ const file_inference_v1_inference_proto_rawDesc = "" +
 	"\x0eSTATUS_SUCCESS\x10\x01\x12\x12\n" +
 	"\x0eSTATUS_FAILURE\x10\x02\x12\x12\n" +
 	"\x0eSTATUS_PENDING\x10\x03\x12\x15\n" +
-	"\x11STATUS_PROCESSING\x10\x042\xbb\x01\n" +
-	"\x10InferenceService\x12W\n" +
+	"\x11STATUS_PROCESSING\x10\x042\x8e\x02\n" +
+	"\x10InferenceService\x12Q\n" +
+	"\bRegister\x12!.inference.v1.api.RegisterRequest\x1a\".inference.v1.api.RegisterResponse\x12W\n" +
 	"\n" +
 	"CreateTask\x12#.inference.v1.api.CreateTaskRequest\x1a$.inference.v1.api.CreateTaskResponse\x12N\n" +
 	"\aGetTask\x12 .inference.v1.api.GetTaskRequest\x1a!.inference.v1.api.GetTaskResponseB6Z4audio-inference-service/gen/inference/v1;inferencev1b\x06proto3"
@@ -531,29 +625,33 @@ func file_inference_v1_inference_proto_rawDescGZIP() []byte {
 }
 
 var file_inference_v1_inference_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_inference_v1_inference_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_inference_v1_inference_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_inference_v1_inference_proto_goTypes = []any{
 	(TaskStatus)(0),            // 0: inference.v1.api.TaskStatus
-	(*CreateTaskRequest)(nil),  // 1: inference.v1.api.CreateTaskRequest
-	(*CreateTaskResponse)(nil), // 2: inference.v1.api.CreateTaskResponse
-	(*GetTaskRequest)(nil),     // 3: inference.v1.api.GetTaskRequest
-	(*GetTaskResponse)(nil),    // 4: inference.v1.api.GetTaskResponse
-	(*Task)(nil),               // 5: inference.v1.api.Task
-	(*TaskResult)(nil),         // 6: inference.v1.api.TaskResult
-	(*Chunk)(nil),              // 7: inference.v1.api.Chunk
+	(*RegisterRequest)(nil),    // 1: inference.v1.api.RegisterRequest
+	(*RegisterResponse)(nil),   // 2: inference.v1.api.RegisterResponse
+	(*CreateTaskRequest)(nil),  // 3: inference.v1.api.CreateTaskRequest
+	(*CreateTaskResponse)(nil), // 4: inference.v1.api.CreateTaskResponse
+	(*GetTaskRequest)(nil),     // 5: inference.v1.api.GetTaskRequest
+	(*GetTaskResponse)(nil),    // 6: inference.v1.api.GetTaskResponse
+	(*Task)(nil),               // 7: inference.v1.api.Task
+	(*TaskResult)(nil),         // 8: inference.v1.api.TaskResult
+	(*Chunk)(nil),              // 9: inference.v1.api.Chunk
 }
 var file_inference_v1_inference_proto_depIdxs = []int32{
-	5, // 0: inference.v1.api.CreateTaskResponse.task:type_name -> inference.v1.api.Task
-	5, // 1: inference.v1.api.GetTaskResponse.task:type_name -> inference.v1.api.Task
+	7, // 0: inference.v1.api.CreateTaskResponse.task:type_name -> inference.v1.api.Task
+	7, // 1: inference.v1.api.GetTaskResponse.task:type_name -> inference.v1.api.Task
 	0, // 2: inference.v1.api.Task.status:type_name -> inference.v1.api.TaskStatus
-	6, // 3: inference.v1.api.Task.result:type_name -> inference.v1.api.TaskResult
-	7, // 4: inference.v1.api.TaskResult.chunks:type_name -> inference.v1.api.Chunk
-	1, // 5: inference.v1.api.InferenceService.CreateTask:input_type -> inference.v1.api.CreateTaskRequest
-	3, // 6: inference.v1.api.InferenceService.GetTask:input_type -> inference.v1.api.GetTaskRequest
-	2, // 7: inference.v1.api.InferenceService.CreateTask:output_type -> inference.v1.api.CreateTaskResponse
-	4, // 8: inference.v1.api.InferenceService.GetTask:output_type -> inference.v1.api.GetTaskResponse
-	7, // [7:9] is the sub-list for method output_type
-	5, // [5:7] is the sub-list for method input_type
+	8, // 3: inference.v1.api.Task.result:type_name -> inference.v1.api.TaskResult
+	9, // 4: inference.v1.api.TaskResult.chunks:type_name -> inference.v1.api.Chunk
+	1, // 5: inference.v1.api.InferenceService.Register:input_type -> inference.v1.api.RegisterRequest
+	3, // 6: inference.v1.api.InferenceService.CreateTask:input_type -> inference.v1.api.CreateTaskRequest
+	5, // 7: inference.v1.api.InferenceService.GetTask:input_type -> inference.v1.api.GetTaskRequest
+	2, // 8: inference.v1.api.InferenceService.Register:output_type -> inference.v1.api.RegisterResponse
+	4, // 9: inference.v1.api.InferenceService.CreateTask:output_type -> inference.v1.api.CreateTaskResponse
+	6, // 10: inference.v1.api.InferenceService.GetTask:output_type -> inference.v1.api.GetTaskResponse
+	8, // [8:11] is the sub-list for method output_type
+	5, // [5:8] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
 	5, // [5:5] is the sub-list for extension extendee
 	0, // [0:5] is the sub-list for field type_name
@@ -570,7 +668,7 @@ func file_inference_v1_inference_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_inference_v1_inference_proto_rawDesc), len(file_inference_v1_inference_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

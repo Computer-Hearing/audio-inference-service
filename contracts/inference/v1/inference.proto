@@ -5,8 +5,18 @@ package inference.v1.api;
 option go_package = "audio-inference-service/gen/inference/v1;inferencev1";
 
 service InferenceService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+}
+
+// RegisterRequest запрашивает регистрацию. Пустой username — сгенерировать анонимный.
+message RegisterRequest {
+  string username = 1;
+}
+
+message RegisterResponse {
+  string username = 1;
 }
 
 message CreateTaskRequest {
