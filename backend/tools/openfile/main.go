@@ -1,5 +1,5 @@
 // Command openfile запрашивает путь до аудиофайла, читает его,
-// сериализует в CreateTaskRequest и печатает готовый JSON для buf curl.
+// сериализует в CreateTaskRequest и печатает готовый JSON для buf curl (для postman тоже подойдет)
 package main
 
 import (
@@ -45,7 +45,7 @@ func run() error {
 		return fmt.Errorf("path is empty")
 	}
 
-	fmt.Print("Название модели (например cnn_2): ")
+	fmt.Print("Название модели (например cnn_predict_pipeline_2): ")
 	model, err := reader.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf("read model: %w", err)
