@@ -1,3 +1,6 @@
+//go:build router
+
+// Deprecated: user connect
 package router
 
 import (
@@ -30,13 +33,6 @@ func New(logger *slog.Logger, h *handlers.Handlers, apiPrefix string) http.Handl
 		middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.DeleteHistory)))
 
 	mux.HandleFunc(fmt.Sprintf("POST %s/api/v1/register", apiPrefix), h.Register)
-
-	mux.Handle(fmt.Sprintf("DELETE %s/api/v1/model/{model_name}", apiPrefix),
-		middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.DeleteModel)))
-	mux.Handle(fmt.Sprintf("POST %s/api/v1/model", apiPrefix),
-		middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.UpsertModel)))
-	mux.Handle(fmt.Sprintf("GET %s/api/v1/models", apiPrefix),
-		middleware.CheckUsernameCookie(logger, http.HandlerFunc(h.ListModels)))
 
 	return middleware.Recovery(logger)(
 		middleware.Logging(logger)(mux),

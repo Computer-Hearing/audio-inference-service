@@ -22,6 +22,10 @@ type Task struct {
 
 type TaskID string
 
+func (t TaskID) String() string {
+	return string(t)
+}
+
 func (t TaskID) IsValid() error {
 	if t == "" {
 		return pkg.APIError{Message: "taskID is empty", StatusCode: http.StatusBadRequest}

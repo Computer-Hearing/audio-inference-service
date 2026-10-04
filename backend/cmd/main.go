@@ -1,14 +1,14 @@
 package main
 
 import (
+	"audio-inference-service/gen/inference/v1/inferencev1connect"
 	"audio-inference-service/internal/config"
 	"audio-inference-service/internal/modules/catalog"
 	"audio-inference-service/internal/modules/predictor"
 	"audio-inference-service/internal/modules/sqlite"
 	"audio-inference-service/internal/modules/taskpipe"
 	"audio-inference-service/internal/modules/triton"
-	"audio-inference-service/internal/server/rest/handlers"
-	"audio-inference-service/internal/server/rest/router"
+	handlers "audio-inference-service/internal/server/connect"
 	"audio-inference-service/pkg"
 	"context"
 	"errors"
@@ -19,6 +19,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"connectrpc.com/connect"
 )
 
 func main() {
@@ -46,7 +48,7 @@ func main() {
 
 	tritonClient, err := triton.NewTritonClient(triton.DefaultConfig(cfg.TritonAddr))
 	if err != nil {
-		logger.Error("failed to create triton client", "err", err.Error())
+		logger.Error("triton client error", "error", err.Error())
 		os.Exit(1)
 	}
 	defer tritonClient.Close()
@@ -55,27 +57,40 @@ func main() {
 		logger.Error("failed to connect to triton", "addr", cfg.TritonAddr, "err", err.Error())
 		os.Exit(1)
 	}
-	logger.Info("connected to triton", "addr", cfg.TritonAddr)
+	logger.Info("triton connect sucess", "addr", cfg.TritonAddr)
 
 	taskManager := sqlite.New(db)
-	predict := &predictor.Predictor{
+	predict := predictor.New(&predictor.Options{
 		TritonConnector: tritonClient,
 		TaskManager:     taskManager,
-	}
+	})
 
 	// Запускаем воркеры и диспетчера задач
 	taskpipe.StartPipeline(ctx, taskManager, predict)
 
 	modelCatalog := catalog.New(tritonClient, 30*time.Second)
-	handlers := handlers.New(handlers.Options{
-		TaskLoader: taskManager, Catalog: modelCatalog, Models: taskManager, Logger: logger,
+
+	h := handlers.New(handlers.Options{
+		TaskLoader: taskManager,
+		Catalog:    modelCatalog,
+		Logger:     logger,
 	})
+	path, connectHandler := inferencev1connect.NewInferenceServiceHandler(h,
+		connect.WithInterceptors(handlers.NewUsernameInterceptor()),
+		connect.WithReadMaxBytes(4<<20+64<<10),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(path, connectHandler)
+
 	srv := &http.Server{
 		Addr:         cfg.HTTPAddr,
-		Handler:      router.New(logger, handlers, cfg.APIPrefix),
+		Handler:      mux,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 5 * time.Minute,
+		Protocols:    &http.Protocols{},
 	}
+	srv.Protocols.SetUnencryptedHTTP2(true)
 
 	go func() {
 		logger.Info("http server started", "addr", cfg.HTTPAddr)
@@ -106,6 +121,5 @@ func printConfig(cfg *config.Config, logger *slog.Logger) {
 		slog.String("LogLevel", cfg.LogLevel),
 		slog.String("HTTP_ADDR", cfg.HTTPAddr),
 		slog.String("DB_PATH", cfg.DBPath),
-		slog.String("TRITON_ADDR", cfg.TritonAddr),
-		slog.String("API_PREFIX", cfg.APIPrefix))
+		slog.String("TRITON_ADDR", cfg.TritonAddr))
 }

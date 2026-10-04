@@ -16,8 +16,23 @@ import (
 )
 
 type Predictor struct {
+	tritonConnector *triton.TritonClient
+	taskManager     modules.TaskManager
+}
+
+type Options struct {
 	TritonConnector *triton.TritonClient
 	TaskManager     modules.TaskManager
+}
+
+func New(opts *Options) *Predictor {
+	if opts == nil {
+		panic("predictor opts cannot be nil")
+	}
+	return &Predictor{
+		tritonConnector: opts.TritonConnector,
+		taskManager:     opts.TaskManager,
+	}
 }
 
 func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) error {
@@ -27,14 +42,14 @@ func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) err
 	}
 
 	// сам inference
-	result, inferErr := processAudioChunks(ctx, p.TritonConnector, modelName, job.Payload.Chunks)
+	result, inferErr := processAudioChunks(ctx, p.tritonConnector, modelName, job.Payload.Chunks)
 
 	// Обновляем статус в БД
 	err := pkg.RetryDo(ctx, nil, func(ctx context.Context) error {
 		if inferErr != nil {
-			return p.TaskManager.StatusFailure(ctx, job.TaskID, result)
+			return p.taskManager.StatusFailure(ctx, job.TaskID, result)
 		}
-		return p.TaskManager.StatusSuccess(ctx, job.TaskID, result)
+		return p.taskManager.StatusSuccess(ctx, job.TaskID, result)
 	}, pkg.IsRetryableError)
 
 	if err != nil {

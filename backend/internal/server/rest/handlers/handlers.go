@@ -1,3 +1,6 @@
+//go:build handlers
+
+// Deprecated: legacy use connect realization
 package handlers
 
 import (
@@ -186,87 +189,6 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusCreated)
-}
-
-func (h *Handlers) UpsertModel(w http.ResponseWriter, r *http.Request) {
-	username, ok := middleware.GetUsernameFromContext(r.Context())
-	if !ok {
-		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
-		return
-	}
-	if err := username.IsValid(); err != nil {
-		h.handleError(w, err)
-		return
-	}
-
-	var model domain.Model
-	if err := pkg.ParseJSONBody(r, &model); err != nil {
-		h.handleError(w, err)
-		return
-	}
-
-	if err := h.models.UpsertModel(r.Context(), model); err != nil {
-		h.handleError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusCreated)
-}
-
-func (h *Handlers) DeleteModel(w http.ResponseWriter, r *http.Request) {
-	username, ok := middleware.GetUsernameFromContext(r.Context())
-	if !ok {
-		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
-		return
-	}
-	if err := username.IsValid(); err != nil {
-		h.handleError(w, err)
-		return
-	}
-
-	modelName := r.PathValue("model_name")
-
-	if err := h.models.DeleteModelByName(r.Context(), modelName); err != nil {
-		h.handleError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *Handlers) ListModels(w http.ResponseWriter, r *http.Request) {
-	username, ok := middleware.GetUsernameFromContext(r.Context())
-	if !ok {
-		pkg.SendError(h.logger, w, fmt.Errorf("username not found in context"), http.StatusUnauthorized)
-		return
-	}
-	if err := username.IsValid(); err != nil {
-		h.handleError(w, err)
-		return
-	}
-
-	// получаем модели от тритона
-	modelsInfo, err := h.catalog.List(r.Context())
-	if err != nil {
-		pkg.SendError(h.logger, w, fmt.Errorf("model catalog unavailable: %w", err), http.StatusServiceUnavailable)
-		return
-	}
-
-	// получаем модели из бд
-	models, err := h.models.GetModels(r.Context())
-	if err != nil {
-		pkg.SendError(h.logger, w, fmt.Errorf("models list unavailable: %w", err), http.StatusServiceUnavailable)
-	}
-
-	var joinedModels []domain.Model
-	// перебираем модели тритона и смотрим есть ли ее запись в бд
-	for _, modelInfo := range modelsInfo {
-		if model, ok := models[modelInfo.Name]; ok {
-			joinedModels = append(joinedModels, model)
-		}
-	}
-
-	pkg.SendJSON(h.logger, w, joinedModels, http.StatusOK)
 }
 
 func (h *Handlers) handleError(w http.ResponseWriter, err error) {
