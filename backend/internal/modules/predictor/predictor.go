@@ -45,19 +45,15 @@ func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) err
 	result, inferErr := processAudioChunks(ctx, p.tritonConnector, modelName, job.Payload.Chunks)
 
 	// Обновляем статус в БД
-	err := pkg.RetryDo(ctx, nil, func(ctx context.Context) error {
-		if inferErr != nil {
-			return p.taskManager.StatusFailure(ctx, job.TaskID, result)
+	if inferErr != nil {
+		if err := p.taskManager.StatusFailure(ctx, job.TaskID, result); err != nil {
+			return fmt.Errorf("set failure status: %w", err)
 		}
-		return p.taskManager.StatusSuccess(ctx, job.TaskID, result)
-	}, pkg.IsRetryableError)
-
-	if err != nil {
-		return fmt.Errorf("update task status: %w", err)
+		return fmt.Errorf("audio processing failed: %w", inferErr)
 	}
 
-	if inferErr != nil {
-		return fmt.Errorf("audio processing failed: %w", inferErr)
+	if err := p.taskManager.StatusSuccess(ctx, job.TaskID, result); err != nil {
+		return fmt.Errorf("set success status: %w", err)
 	}
 
 	return nil
