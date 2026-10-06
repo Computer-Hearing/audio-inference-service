@@ -3,7 +3,6 @@ package dto
 import (
 	v1 "audio-inference-service/gen/inference/v1"
 	"audio-inference-service/internal/domain"
-	"fmt"
 )
 
 func Task2DTO(task *domain.Task) *v1.Task {
@@ -18,7 +17,7 @@ func Task2DTO(task *domain.Task) *v1.Task {
 		pbTask.Result = &v1.TaskResult{
 			Filename: task.Result.Filename,
 		}
-		fmt.Println(task.Result.Chunks)
+
 		pbChunks := make([]*v1.Chunk, len(task.Result.Chunks))
 		pbTask.Result.Chunks = pbChunks
 		for i, chunk := range task.Result.Chunks {
