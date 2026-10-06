@@ -1,3 +1,5 @@
+// Package sqlite TODO: тут все работает нормально, рефакторить тут нечего, тут только недочеты править надо.
+// потом при переходе на Postgres правки делать лучше уже
 package sqlite
 
 import (
@@ -67,84 +69,14 @@ func (m *SqliteTaskManager) GetTask(
 		}
 		taskResult.Result = &res
 	}
-	// TODO: проверка, что если статус success и json нет, то что-то не так
+
 	return taskResult, nil
-}
-
-func (m *SqliteTaskManager) GetHistory(ctx context.Context, username domain.Username) ([]*domain.FileInferenceResult, error) {
-	if err := username.IsValid(); err != nil {
-		return nil, err
-	}
-
-	query := `SELECT result FROM tasks WHERE username = ? AND status = ? ORDER BY created_at DESC`
-	args := []any{username, dto.TaskStatusToString(domain.TaskStatusSuccess)}
-
-	rows, err := m.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while querying history",
-			Details:    map[string]string{"error": err.Error()},
-		}
-	}
-	defer rows.Close()
-
-	var history []*domain.FileInferenceResult
-	for rows.Next() {
-		var resultJSON string
-		if err := rows.Scan(&resultJSON); err != nil {
-			return nil, pkg.APIError{
-				StatusCode: http.StatusInternalServerError,
-				Message:    "Database error while scanning history row",
-				Details:    map[string]string{"error": err.Error()},
-			}
-		}
-
-		var res domain.FileInferenceResult
-		if err := json.Unmarshal([]byte(resultJSON), &res); err != nil {
-			return nil, pkg.APIError{
-				StatusCode: http.StatusInternalServerError,
-				Message:    "Failed to unmarshal history result",
-				Details:    map[string]string{"error": err.Error()},
-			}
-		}
-		history = append(history, &res)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while iterating history rows",
-			Details:    map[string]string{"error": err.Error()},
-		}
-	}
-
-	return history, nil
-}
-
-func (m *SqliteTaskManager) DeleteHistory(ctx context.Context, username domain.Username) error {
-	if err := username.IsValid(); err != nil {
-		return err
-	}
-
-	query := `DELETE FROM tasks WHERE username = ?`
-	_, err := m.db.ExecContext(ctx, query, username)
-	if err != nil {
-		return pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while deleting history",
-			Details:    map[string]string{"error": err.Error()},
-		}
-	}
-
-	return nil
 }
 
 func (m *SqliteTaskManager) CreateTask(
 	ctx context.Context, username domain.Username,
 	taskID domain.TaskID, payload domain.AudioTaskPayload) error {
 	// Валидация всех полей
-	// TODO: в pkg.errors добавить, чтобы можно было ошибку множественной делать и мапа расширялась для ошибок в одну
 	details := make(map[string]string)
 	if string(username) == "" {
 		details["username"] = "cannot be empty"
@@ -390,5 +322,3 @@ func (m *SqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domai
 
 	return nil
 }
-
-// ------------------------- РАБОТА С МОДЕЛЯМИ -------------------------------------------------------------------------
