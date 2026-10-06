@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"connectrpc.com/connect"
 )
@@ -37,7 +38,7 @@ func New(opts *Options) *Handlers {
 
 var _ inferencev1connect.InferenceServiceClient = (*Handlers)(nil)
 
-func (h Handlers) CreateTask(
+func (h *Handlers) CreateTask(
 	ctx context.Context, c *connect.Request[v1.CreateTaskRequest]) (
 	*connect.Response[v1.CreateTaskResponse], error) {
 
@@ -107,7 +108,7 @@ func (h Handlers) CreateTask(
 	}, nil
 }
 
-func (h Handlers) GetTask(
+func (h *Handlers) GetTask(
 	ctx context.Context, c *connect.Request[v1.GetTaskRequest]) (
 	*connect.Response[v1.GetTaskResponse], error) {
 
@@ -137,4 +138,33 @@ func (h Handlers) GetTask(
 			Task: dto.Task2DTO(task),
 		},
 	}, nil
+}
+
+// Register регистрирует пользователя и выставляет username-cookie.
+func (h *Handlers) Register(
+	ctx context.Context, c *connect.Request[v1.RegisterRequest]) (
+	*connect.Response[v1.RegisterResponse], error) {
+
+	if existing, ok := cookieValue(c.Header(), pkg.UsernameCookieKey); ok {
+		return nil,
+			connect.NewError(connect.CodeAlreadyExists, fmt.Errorf("user already authenticated: %s", existing))
+	}
+
+	username := pkg.UsernameGenerator(c.Msg.Username)
+	h.logger.Debug("Registering", "username", username)
+
+	cookie := &http.Cookie{
+		Name:     pkg.UsernameCookieKey,
+		Value:    username,
+		Path:     "/",
+		MaxAge:   2147483647,
+		HttpOnly: true,
+		Secure:   os.Getenv("ENV") == "production",
+		SameSite: http.SameSiteLaxMode,
+	}
+
+	resp := connect.NewResponse(&v1.RegisterResponse{Username: username})
+	resp.Header().Add("Set-Cookie", cookie.String())
+
+	return resp, nil
 }

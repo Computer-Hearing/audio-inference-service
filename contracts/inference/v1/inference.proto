@@ -10,7 +10,7 @@ service InferenceService {
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
 }
 
-// RegisterRequest запрашивает регистрацию. Пустой username — сгенерировать анонимный.
+// RegisterRequest запрашивает регистрацию. Пустой username — сгенерировать анонимный
 message RegisterRequest {
   string username = 1;
 }
