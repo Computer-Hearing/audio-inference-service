@@ -1,17 +1,8 @@
 package pkg
 
 import (
-	"errors"
 	"fmt"
-	"log/slog"
-	"net/http"
 	"strings"
-)
-
-const (
-	AuthorErrorSqlite   string = "sqlite"
-	AuthorErrorTriton   string = "triton"
-	AuthorErrorPipeline string = "pipeline"
 )
 
 type APIError struct {
@@ -46,13 +37,4 @@ func (e APIError) stringDetails() string {
 		i++
 	}
 	return b.String()
-}
-
-func HandleError(w http.ResponseWriter, logger *slog.Logger, err error) {
-	var errApi APIError
-	if errors.As(err, &errApi) {
-		SendError(logger, w, &errApi, errApi.StatusCode)
-		return
-	}
-	SendError(logger, w, err, http.StatusInternalServerError)
 }

@@ -10,10 +10,6 @@ import (
 type TaskManager interface {
 	// GetTask - получить задачу: её статус и результат инференса, если он уже сохранён
 	GetTask(ctx context.Context, taskID domain.TaskID, username domain.Username) (*domain.Task, error)
-	// GetHistory - получить всю историю запросов
-	GetHistory(ctx context.Context, username domain.Username) ([]*domain.FileInferenceResult, error)
-	// DeleteHistory - очистить всю историю запросов
-	DeleteHistory(ctx context.Context, username domain.Username) error
 
 	// CreateTask - создать задачу, то есть создать в бд строку со статусом pending
 	CreateTask(ctx context.Context, username domain.Username, taskID domain.TaskID, payload domain.AudioTaskPayload) error
