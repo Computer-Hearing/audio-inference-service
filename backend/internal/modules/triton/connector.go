@@ -76,18 +76,31 @@ func (c *TritonClient) Connect(ctx context.Context) error {
 		),
 	}
 
-	dialCtx, cancel := context.WithTimeout(ctx, c.config.Timeout)
+	// NewClient создаёт соединение лениво, без блокировки — поэтому проверяем
+	// доступность сервера явным ServerLive, чтобы падать на старте, а не на
+	// первом инференсе.
+	conn, err := grpc.NewClient(c.config.ServerAddress, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to create Triton client: %w", err)
+	}
+
+	client := pb.NewGRPCInferenceServiceClient(conn)
+
+	pingCtx, cancel := context.WithTimeout(ctx, c.config.Timeout)
 	defer cancel()
 
-	// grpc.DialContext с блокировкой до установления соединения
-	conn, err := grpc.DialContext(dialCtx, c.config.ServerAddress,
-		append(opts, grpc.WithBlock())...)
+	resp, err := client.ServerLive(pingCtx, &pb.ServerLiveRequest{})
 	if err != nil {
+		_ = conn.Close()
 		return fmt.Errorf("failed to connect to Triton: %w", err)
+	}
+	if !resp.GetLive() {
+		_ = conn.Close()
+		return fmt.Errorf("triton server is not live")
 	}
 
 	c.conn = conn
-	c.client = pb.NewGRPCInferenceServiceClient(conn)
+	c.client = client
 	c.isConnected = true
 
 	return nil
