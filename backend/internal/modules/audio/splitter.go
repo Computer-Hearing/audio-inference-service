@@ -4,7 +4,6 @@ import (
 	"audio-inference-service/pkg"
 	"bytes"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,16 +36,16 @@ func Split(opts Options) (*AudioChunks, error) {
 	data, filename, secondsPerChunk := opts.Data, opts.Filename, opts.SecondsPerChunk
 
 	if len(data) == 0 {
-		return nil, &pkg.APIError{Message: "audio file is empty", StatusCode: http.StatusBadRequest}
+		return nil, pkg.NewBadRequestError("audio file is empty")
 	}
 	if secondsPerChunk <= 0 {
-		return nil, &pkg.APIError{Message: "seconds_per_chunk is empty", StatusCode: http.StatusBadRequest}
+		return nil, pkg.NewBadRequestError("seconds_per_chunk is empty")
 	}
 
 	// создаем временную директорию, куда чанки будут резаться
 	tmpDir, err := os.MkdirTemp("", "audio_split")
 	if err != nil {
-		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
+		return nil, pkg.NewInternalError(err.Error())
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -59,7 +58,7 @@ func Split(opts Options) (*AudioChunks, error) {
 	// сохраняем файл, который из proto пришел в эту временную директорию
 	inputPath := filepath.Join(tmpDir, "input"+ext)
 	if err := os.WriteFile(inputPath, data, 0o600); err != nil {
-		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
+		return nil, pkg.NewInternalError(err.Error())
 	}
 
 	// получаем длительность звука
@@ -123,7 +122,7 @@ func Split(opts Options) (*AudioChunks, error) {
 func segmentLayer(inputPath, layerDir, ext string, offset, chunkSeconds int, trim float64) ([]string, error) {
 	// создаем временную папку под слой
 	if err := os.MkdirAll(layerDir, 0o755); err != nil {
-		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
+		return nil, pkg.NewInternalError(err.Error())
 	}
 
 	// паттерн для нарезания файлов (chunk_001.wav, chunk_002.wav, ...)
@@ -154,17 +153,16 @@ func segmentLayer(inputPath, layerDir, ext string, offset, chunkSeconds int, tri
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, &pkg.APIError{
-			Message:    fmt.Sprintf("ffmpeg: %s", err.Error()),
-			StatusCode: http.StatusInternalServerError,
-			Details:    map[string]string{"stderr": stderr.String()},
-		}
+		return nil, pkg.NewInternalWithDetails(
+			fmt.Sprintf("ffmpeg: %s", err.Error()),
+			map[string]string{"stderr": stderr.String()},
+		)
 	}
 
 	// получаем названия файлов всех нарезанных чанков
 	matches, err := filepath.Glob(filepath.Join(layerDir, "chunk_*"+ext))
 	if err != nil {
-		return nil, &pkg.APIError{Message: err.Error(), StatusCode: http.StatusInternalServerError}
+		return nil, pkg.NewInternalError(err.Error())
 	}
 	sort.Strings(matches)
 
@@ -184,16 +182,15 @@ func audioDurationSeconds(inputPath string) (float64, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return 0, &pkg.APIError{
-			Message:    fmt.Sprintf("ffprobe: %s", err.Error()),
-			StatusCode: http.StatusInternalServerError,
-			Details:    map[string]string{"stderr": stderr.String()},
-		}
+		return 0, pkg.NewInternalWithDetails(
+			fmt.Sprintf("ffprobe: %s", err.Error()),
+			map[string]string{"stderr": stderr.String()},
+		)
 	}
 
 	duration, err := strconv.ParseFloat(strings.TrimSpace(stdout.String()), 64)
 	if err != nil {
-		return 0, &pkg.APIError{Message: fmt.Sprintf("ffprobe duration parse: %s", err.Error()), StatusCode: http.StatusInternalServerError}
+		return 0, pkg.NewInternalError(fmt.Sprintf("ffprobe duration parse: %s", err.Error()))
 	}
 
 	return duration, nil

@@ -44,30 +44,26 @@ func (h *Handlers) CreateTask(
 
 	username, ok := GetUsernameFromContext(ctx)
 	if !ok {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusUnauthorized,
-			Message:    "user is not authenticated",
-		}
+		return nil, pkg.ConnectError(pkg.NewUnauthorizedError("user is not authenticated"))
 	}
 	if err := username.IsValid(); err != nil {
-		return nil, err
+		return nil, pkg.ConnectError(err)
 	}
 
 	available, err := h.catalog.IsAvailable(ctx, c.Msg.ModelName)
 	if err != nil {
 		// Тритон недоступен — отклоняем запрос
-		return nil, pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "model catalog unavailable, cannot verify model",
-			Details:    map[string]string{"error": err.Error()},
-		}
-
+		return nil, pkg.ConnectError(
+			pkg.NewServiceUnavailableWithDetails(
+				"catalog: model catalog unavailable, cannot verify model",
+				map[string]string{"error": err.Error()},
+			),
+		)
 	} else if !available {
 		// Модели нет в тритон
-		return nil, pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    fmt.Sprintf("triton: unknown or unsupported model: %s", c.Msg.ModelName),
-		}
+		return nil, pkg.ConnectError(
+			pkg.NewBadRequestError(fmt.Sprintf("triton: unknown or unsupported model: %s", c.Msg.ModelName)),
+		)
 	}
 
 	// генерируем таск id
@@ -75,10 +71,9 @@ func (h *Handlers) CreateTask(
 	h.logger.Info("models", slog.Any("slice", h.modelStorage.Names()))
 	modelConfig, ok := h.modelStorage.Get(c.Msg.ModelName)
 	if !ok {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    fmt.Sprintf("storage: unknown or unsupported model: %s", c.Msg.ModelName),
-		}
+		return nil, pkg.ConnectError(
+			pkg.NewBadRequestError(fmt.Sprintf("storage: unknown or unsupported model: %s", c.Msg.ModelName)),
+		)
 	}
 
 	// получаем чанки
@@ -88,12 +83,12 @@ func (h *Handlers) CreateTask(
 		SecondsPerChunk: modelConfig.SecondsPerChunk,
 	})
 	if err != nil {
-		return nil, err
+		return nil, pkg.ConnectError(fmt.Errorf("audio split: %w", err))
 	}
 
 	payload := domain.AudioTaskPayload{ModelName: c.Msg.ModelName, Chunks: *ch}
 	if err := h.taskLoader.CreateTask(ctx, username, taskID, payload); err != nil {
-		return nil, err
+		return nil, pkg.ConnectError(fmt.Errorf("create task: %w", err))
 	}
 
 	// Отдаем ответ
@@ -114,23 +109,20 @@ func (h *Handlers) GetTask(
 
 	username, ok := GetUsernameFromContext(ctx)
 	if !ok {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusUnauthorized,
-			Message:    "user is not authenticated",
-		}
+		return nil, pkg.ConnectError(pkg.NewUnauthorizedError("user is not authenticated"))
 	}
 	if err := username.IsValid(); err != nil {
-		return nil, err
+		return nil, pkg.ConnectError(err)
 	}
 
 	taskID := domain.TaskID(c.Msg.TaskId)
 	if err := taskID.IsValid(); err != nil {
-		return nil, err
+		return nil, pkg.ConnectError(err)
 	}
 
 	task, err := h.taskLoader.GetTask(ctx, taskID, username)
 	if err != nil {
-		return nil, err
+		return nil, pkg.ConnectError(fmt.Errorf("get task: %w", err))
 	}
 
 	return &connect.Response[v1.GetTaskResponse]{
@@ -146,12 +138,13 @@ func (h *Handlers) Register(
 	*connect.Response[v1.RegisterResponse], error) {
 
 	if existing, ok := cookieValue(c.Header(), pkg.UsernameCookieKey); ok {
-		return nil,
-			connect.NewError(connect.CodeAlreadyExists, fmt.Errorf("user already authenticated: %s", existing))
+		return nil, pkg.ConnectError(
+			pkg.NewConflictError(fmt.Sprintf("user already authenticated: %s", existing)),
+		)
 	}
 
 	username := pkg.UsernameGenerator(c.Msg.Username)
-	h.logger.Debug("Registering", "username", username)
+	h.logger.Debug("Generating username", "username", username)
 
 	cookie := &http.Cookie{
 		Name:     pkg.UsernameCookieKey,

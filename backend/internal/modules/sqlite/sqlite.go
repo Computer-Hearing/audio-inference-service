@@ -11,7 +11,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"net/http"
 )
 
 type SqliteTaskManager struct {
@@ -39,17 +38,15 @@ func (m *SqliteTaskManager) GetTask(
 	err := m.db.QueryRowContext(ctx, query, username, taskID).Scan(&status, &resultJSON, &model)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, pkg.APIError{
-				StatusCode: http.StatusNotFound,
-				Message:    "Task not found",
-				Details:    map[string]string{"taskID": string(taskID)},
-			}
+			return nil, pkg.NewNotFoundWithDetails(
+				"Task not found",
+				map[string]string{"taskID": string(taskID)},
+			)
 		}
-		return nil, pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Database error while getting task",
-			Details:    map[string]string{"error": err.Error()},
-		}
+		return nil, pkg.NewInternalWithDetails(
+			"Database error while getting task",
+			map[string]string{"error": err.Error()},
+		)
 	}
 
 	taskResult := &domain.Task{
@@ -61,11 +58,10 @@ func (m *SqliteTaskManager) GetTask(
 	if resultJSON.Valid && resultJSON.String != "" {
 		var res domain.FileInferenceResult
 		if err := json.Unmarshal([]byte(resultJSON.String), &res); err != nil {
-			return nil, pkg.APIError{
-				StatusCode: http.StatusInternalServerError,
-				Message:    "Failed to unmarshal task result",
-				Details:    map[string]string{"taskID": string(taskID), "error": err.Error()},
-			}
+			return nil, pkg.NewInternalWithDetails(
+				"Failed to unmarshal task result",
+				map[string]string{"taskID": string(taskID), "error": err.Error()},
+			)
 		}
 		taskResult.Result = &res
 	}
@@ -91,20 +87,15 @@ func (m *SqliteTaskManager) CreateTask(
 		details["model"] = "cannot be empty"
 	}
 	if len(details) > 0 {
-		return pkg.APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "create task validation failed",
-			Details:    details,
-		}
+		return pkg.NewBadRequestWithDetails("create task validation failed", details)
 	}
 
 	chunksJSON, err := json.Marshal(payload.Chunks)
 	if err != nil {
-		return pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "marshal audio chunks failed",
-			Details:    map[string]string{"error": err.Error()},
-		}
+		return pkg.NewInternalWithDetails(
+			"marshal audio chunks failed",
+			map[string]string{"error": err.Error()},
+		)
 	}
 
 	query := `
@@ -118,11 +109,10 @@ func (m *SqliteTaskManager) CreateTask(
 		payload.ModelName, string(chunksJSON),
 	)
 	if err != nil {
-		return pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "create task error",
-			Details:    map[string]string{"error": err.Error()},
-		}
+		return pkg.NewInternalWithDetails(
+			"create task error",
+			map[string]string{"error": err.Error()},
+		)
 	}
 
 	return nil
@@ -130,11 +120,10 @@ func (m *SqliteTaskManager) CreateTask(
 
 func (m *SqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int) ([]domain.TaskPayload, error) {
 	if limit <= 0 {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "tasks limit validation failed",
-			Details:    map[string]string{"limit": "must be greater than 0"},
-		}
+		return nil, pkg.NewBadRequestWithDetails(
+			"tasks limit validation failed",
+			map[string]string{"limit": "must be greater than 0"},
+		)
 	}
 
 	query := `
@@ -160,11 +149,10 @@ func (m *SqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 		limit,
 	)
 	if err != nil {
-		return nil, pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "error while fetching tasks",
-			Details:    map[string]string{"error": err.Error()},
-		}
+		return nil, pkg.NewInternalWithDetails(
+			"error while fetching tasks",
+			map[string]string{"error": err.Error()},
+		)
 	}
 	defer rows.Close()
 
@@ -173,11 +161,10 @@ func (m *SqliteTaskManager) GetAndMarkProcessing(ctx context.Context, limit int)
 		var taskID, chunksJSON, model string
 
 		if err := rows.Scan(&taskID, &chunksJSON, &model); err != nil {
-			return nil, pkg.APIError{
-				StatusCode: http.StatusInternalServerError,
-				Message:    "error while scanning task payload",
-				Details:    map[string]string{"error": err.Error()},
-			}
+			return nil, pkg.NewInternalWithDetails(
+				"error while scanning task payload",
+				map[string]string{"error": err.Error()},
+			)
 		}
 
 		var c audio.AudioChunks
@@ -209,20 +196,15 @@ func (m *SqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Tas
 	}
 
 	if len(details) > 0 {
-		return pkg.APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Validation failed",
-			Details:    details,
-		}
+		return pkg.NewBadRequestWithDetails("Validation failed", details)
 	}
 
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
-		return pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "marshal result data error",
-			Details:    map[string]string{"error": err.Error()},
-		}
+		return pkg.NewInternalWithDetails(
+			"marshal result data error",
+			map[string]string{"error": err.Error()},
+		)
 	}
 
 	query := `
@@ -235,11 +217,10 @@ func (m *SqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Tas
 
 	_, err = m.db.ExecContext(ctx, query, dto.TaskStatusToString(domain.TaskStatusSuccess), string(resultJSON), taskID)
 	if err != nil {
-		return pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "set status error",
-			Details:    map[string]string{"error": err.Error()},
-		}
+		return pkg.NewInternalWithDetails(
+			"set status error",
+			map[string]string{"error": err.Error()},
+		)
 	}
 
 	return nil
@@ -247,22 +228,20 @@ func (m *SqliteTaskManager) StatusSuccess(ctx context.Context, taskID domain.Tas
 
 func (m *SqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.TaskID, result *domain.FileInferenceResult) error {
 	if string(taskID) == "" {
-		return pkg.APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Validation failed",
-			Details:    map[string]string{"taskID": "cannot be empty"},
-		}
+		return pkg.NewBadRequestWithDetails(
+			"Validation failed",
+			map[string]string{"taskID": "cannot be empty"},
+		)
 	}
 
 	var resultJSON interface{}
 	if result != nil {
 		raw, err := json.Marshal(result)
 		if err != nil {
-			return pkg.APIError{
-				StatusCode: http.StatusInternalServerError,
-				Message:    "Failed to marshal partial result data",
-				Details:    map[string]string{"error": err.Error()},
-			}
+			return pkg.NewInternalWithDetails(
+				"Failed to marshal partial result data",
+				map[string]string{"error": err.Error()},
+			)
 		}
 		resultJSON = string(raw)
 	}
@@ -277,11 +256,10 @@ func (m *SqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Tas
 
 	_, err := m.db.ExecContext(ctx, query, dto.TaskStatusToString(domain.TaskStatusFailure), resultJSON, taskID)
 	if err != nil {
-		return pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "set status error",
-			Details:    map[string]string{"error": err.Error()},
-		}
+		return pkg.NewInternalWithDetails(
+			"set status error",
+			map[string]string{"error": err.Error()},
+		)
 	}
 
 	return nil
@@ -289,11 +267,10 @@ func (m *SqliteTaskManager) StatusFailure(ctx context.Context, taskID domain.Tas
 
 func (m *SqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domain.TaskID) error {
 	if string(taskID) == "" {
-		return pkg.APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Validation failed",
-			Details:    map[string]string{"taskID": "cannot be empty"},
-		}
+		return pkg.NewBadRequestWithDetails(
+			"Validation failed",
+			map[string]string{"taskID": "cannot be empty"},
+		)
 	}
 
 	query := `
@@ -313,11 +290,10 @@ func (m *SqliteTaskManager) IncrementTaskError(ctx context.Context, taskID domai
 		taskID,
 	)
 	if err != nil {
-		return pkg.APIError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "increment task error",
-			Details:    map[string]string{"error": err.Error()},
-		}
+		return pkg.NewInternalWithDetails(
+			"increment task error",
+			map[string]string{"error": err.Error()},
+		)
 	}
 
 	return nil

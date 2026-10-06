@@ -5,7 +5,6 @@ import (
 	"audio-inference-service/pkg"
 	"crypto/md5"
 	"fmt"
-	"net/http"
 
 	"github.com/google/uuid"
 )
@@ -28,7 +27,7 @@ func (t TaskID) String() string {
 
 func (t TaskID) IsValid() error {
 	if t == "" {
-		return pkg.APIError{Message: "taskID is empty", StatusCode: http.StatusBadRequest}
+		return pkg.NewBadRequestError("taskID is empty")
 	}
 	return nil
 }
