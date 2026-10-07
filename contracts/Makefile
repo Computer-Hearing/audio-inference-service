@@ -1,6 +1,6 @@
 .PHONY: generate-all generate generate-js lint clean install-buf-go install-buf-npm install-js-npm install-all
 
-# Инструкция, как генерировать файлы из proto
+# Инструкция, как генерировать файлы
 # 1) Вы должны находиться в текущей директории, то есть в contracts/
 #	 Если вы не в ней выполните из корня репозитория: cd contracts
 #	 	все просто.
