@@ -161,3 +161,23 @@ func (h *Handlers) Register(
 
 	return resp, nil
 }
+
+func (h *Handlers) GetModels(
+	ctx context.Context, _ *connect.Request[v1.GetModelsRequest]) (
+	*connect.Response[v1.GetModelsResponse], error) {
+
+	username, ok := GetUsernameFromContext(ctx)
+	if !ok {
+		return nil, pkg.ConnectError(pkg.NewUnauthorizedError("user is not authenticated"))
+	}
+	if err := username.IsValid(); err != nil {
+		return nil, pkg.ConnectError(err)
+	}
+
+	// получаем модели из хранилища
+	storageModels := h.modelStorage.GetAll()
+
+	return connect.NewResponse(&v1.GetModelsResponse{
+		Models: dto.Models2DTO(storageModels),
+	}), nil
+}

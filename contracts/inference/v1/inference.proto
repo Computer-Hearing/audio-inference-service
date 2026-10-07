@@ -8,6 +8,7 @@ service InferenceService {
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc GetModels(GetModelsRequest) returns (GetModelsResponse);
 }
 
 // RegisterRequest запрашивает регистрацию. Пустой username — сгенерировать анонимный
@@ -37,11 +38,27 @@ message GetTaskResponse {
   Task task = 1;
 }
 
+message GetModelsRequest {}
+message GetModelsResponse {
+  repeated Model models = 1;
+}
+
 message Task {
   string task_id = 1;
   TaskStatus status = 2;
   string model = 3;
   TaskResult result = 4;
+}
+
+message Model {
+  string name = 1;
+  string projectTitle = 2;
+  string projectDescription = 3;
+  int32  secondsPerChunk = 4;
+  int32  targetClassesNum = 5;
+  int32  categoryClassesNum = 6;
+  bool   ready = 7;
+  string state = 8;
 }
 
 message TaskResult {

@@ -1,9 +1,14 @@
-.PHONY: generate generate-js lint clean check-plugins check-plugins-grpc check-plugins-js install-buf
+.PHONY: generate-all generate generate-js lint clean install-buf-go install-buf-npm install-js-npm install-all
 
-generate: check-plugins
+# Сгенерировать все
+generate-all: generate generate-js
+
+# Сгенерировать go файлы
+generate:
 	buf generate
 
-generate-js: check-plugins-js
+# Сгенерировать js файлы
+generate-js:
 	buf generate --template buf.gen.js.yaml
 
 lint:
@@ -12,16 +17,17 @@ lint:
 clean:
 	rm -rf ../backend/gen ../frontend/src/gen
 
-check-plugins: check-plugins-grpc check-plugins-js
-	@command -v protoc-gen-connect-go >/dev/null || { echo "go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest"; exit 1; }
+install-buf-go:
+	CGO_ENABLED=0 go install github.com/bufbuild/buf/cmd/buf@latest
 
-check-plugins-grpc:
-	@command -v buf >/dev/null || { echo "install buf: https://buf.build/docs/installation"; exit 1; }
-	@command -v protoc-gen-go >/dev/null || { echo "go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"; exit 1; }
+# Альтернатива через npm — работает без Go, нужен только Node.js
+install-buf-npm:
+	npm install -g @bufbuild/buf
 
-check-plugins-js:
-	@command -v buf >/dev/null || { echo "install buf: https://buf.build/docs/installation"; exit 1; }
-	@[ -x ../frontend/node_modules/.bin/protoc-gen-es ] || (cd ../frontend && npm install)
+# Глобальная установка JS-плагинов buf — попадают в глобальный bin npm,
+# который уже в PATH, поэтому buf их находит без доп. настройки
+install-js-npm:
+	npm install -g @bufbuild/protoc-gen-es @connectrpc/protoc-gen-connect-es
 
-install-buf:
-	go install github.com/bufbuild/buf/cmd/buf@latest
+# Установить всё нужное для генерации, требует npm
+install-all: install-buf-npm install-js-npm

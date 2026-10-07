@@ -3,6 +3,7 @@ package dto
 import (
 	v1 "audio-inference-service/gen/inference/v1"
 	"audio-inference-service/internal/domain"
+	"audio-inference-service/internal/modules/models"
 	"fmt"
 )
 
@@ -34,4 +35,25 @@ func Task2DTO(task *domain.Task) *v1.Task {
 	}
 
 	return pbTask
+}
+
+func Models2DTO(models []models.ModelConfig) []*v1.Model {
+	dtoModels := make([]*v1.Model, len(models))
+	for i, model := range models {
+		dtoModels[i] = Model2DTO(model)
+	}
+	return dtoModels
+}
+
+func Model2DTO(model models.ModelConfig) *v1.Model {
+	return &v1.Model{
+		Name:               model.Name,
+		ProjectTitle:       model.ProjectTitle,
+		ProjectDescription: model.ProjectDescription,
+		SecondsPerChunk:    int32(model.SecondsPerChunk),
+		TargetClassesNum:   int32(model.TargetClassesNum),
+		CategoryClassesNum: int32(model.CategoryClassesNum),
+		Ready:              model.Ready,
+		State:              model.State,
+	}
 }

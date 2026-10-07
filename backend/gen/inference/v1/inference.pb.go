@@ -357,6 +357,86 @@ func (x *GetTaskResponse) GetTask() *Task {
 	return nil
 }
 
+type GetModelsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetModelsRequest) Reset() {
+	*x = GetModelsRequest{}
+	mi := &file_inference_v1_inference_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetModelsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetModelsRequest) ProtoMessage() {}
+
+func (x *GetModelsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_inference_v1_inference_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetModelsRequest.ProtoReflect.Descriptor instead.
+func (*GetModelsRequest) Descriptor() ([]byte, []int) {
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{6}
+}
+
+type GetModelsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Models        []*Model               `protobuf:"bytes,1,rep,name=models,proto3" json:"models,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetModelsResponse) Reset() {
+	*x = GetModelsResponse{}
+	mi := &file_inference_v1_inference_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetModelsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetModelsResponse) ProtoMessage() {}
+
+func (x *GetModelsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_inference_v1_inference_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetModelsResponse.ProtoReflect.Descriptor instead.
+func (*GetModelsResponse) Descriptor() ([]byte, []int) {
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetModelsResponse) GetModels() []*Model {
+	if x != nil {
+		return x.Models
+	}
+	return nil
+}
+
 type Task struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
@@ -369,7 +449,7 @@ type Task struct {
 
 func (x *Task) Reset() {
 	*x = Task{}
-	mi := &file_inference_v1_inference_proto_msgTypes[6]
+	mi := &file_inference_v1_inference_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -381,7 +461,7 @@ func (x *Task) String() string {
 func (*Task) ProtoMessage() {}
 
 func (x *Task) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[6]
+	mi := &file_inference_v1_inference_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -394,7 +474,7 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Task.ProtoReflect.Descriptor instead.
 func (*Task) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{6}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Task) GetTaskId() string {
@@ -425,6 +505,106 @@ func (x *Task) GetResult() *TaskResult {
 	return nil
 }
 
+type Model struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Name               string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ProjectTitle       string                 `protobuf:"bytes,2,opt,name=projectTitle,proto3" json:"projectTitle,omitempty"`
+	ProjectDescription string                 `protobuf:"bytes,3,opt,name=projectDescription,proto3" json:"projectDescription,omitempty"`
+	SecondsPerChunk    int32                  `protobuf:"varint,4,opt,name=secondsPerChunk,proto3" json:"secondsPerChunk,omitempty"`
+	TargetClassesNum   int32                  `protobuf:"varint,5,opt,name=targetClassesNum,proto3" json:"targetClassesNum,omitempty"`
+	CategoryClassesNum int32                  `protobuf:"varint,6,opt,name=categoryClassesNum,proto3" json:"categoryClassesNum,omitempty"`
+	Ready              bool                   `protobuf:"varint,7,opt,name=ready,proto3" json:"ready,omitempty"`
+	State              string                 `protobuf:"bytes,8,opt,name=state,proto3" json:"state,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *Model) Reset() {
+	*x = Model{}
+	mi := &file_inference_v1_inference_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Model) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Model) ProtoMessage() {}
+
+func (x *Model) ProtoReflect() protoreflect.Message {
+	mi := &file_inference_v1_inference_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Model.ProtoReflect.Descriptor instead.
+func (*Model) Descriptor() ([]byte, []int) {
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Model) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Model) GetProjectTitle() string {
+	if x != nil {
+		return x.ProjectTitle
+	}
+	return ""
+}
+
+func (x *Model) GetProjectDescription() string {
+	if x != nil {
+		return x.ProjectDescription
+	}
+	return ""
+}
+
+func (x *Model) GetSecondsPerChunk() int32 {
+	if x != nil {
+		return x.SecondsPerChunk
+	}
+	return 0
+}
+
+func (x *Model) GetTargetClassesNum() int32 {
+	if x != nil {
+		return x.TargetClassesNum
+	}
+	return 0
+}
+
+func (x *Model) GetCategoryClassesNum() int32 {
+	if x != nil {
+		return x.CategoryClassesNum
+	}
+	return 0
+}
+
+func (x *Model) GetReady() bool {
+	if x != nil {
+		return x.Ready
+	}
+	return false
+}
+
+func (x *Model) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
 type TaskResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Filename      string                 `protobuf:"bytes,1,opt,name=filename,proto3" json:"filename,omitempty"`
@@ -435,7 +615,7 @@ type TaskResult struct {
 
 func (x *TaskResult) Reset() {
 	*x = TaskResult{}
-	mi := &file_inference_v1_inference_proto_msgTypes[7]
+	mi := &file_inference_v1_inference_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -447,7 +627,7 @@ func (x *TaskResult) String() string {
 func (*TaskResult) ProtoMessage() {}
 
 func (x *TaskResult) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[7]
+	mi := &file_inference_v1_inference_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -460,7 +640,7 @@ func (x *TaskResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskResult.ProtoReflect.Descriptor instead.
 func (*TaskResult) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{7}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *TaskResult) GetFilename() string {
@@ -491,7 +671,7 @@ type Chunk struct {
 
 func (x *Chunk) Reset() {
 	*x = Chunk{}
-	mi := &file_inference_v1_inference_proto_msgTypes[8]
+	mi := &file_inference_v1_inference_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -503,7 +683,7 @@ func (x *Chunk) String() string {
 func (*Chunk) ProtoMessage() {}
 
 func (x *Chunk) ProtoReflect() protoreflect.Message {
-	mi := &file_inference_v1_inference_proto_msgTypes[8]
+	mi := &file_inference_v1_inference_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -516,7 +696,7 @@ func (x *Chunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Chunk.ProtoReflect.Descriptor instead.
 func (*Chunk) Descriptor() ([]byte, []int) {
-	return file_inference_v1_inference_proto_rawDescGZIP(), []int{8}
+	return file_inference_v1_inference_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Chunk) GetChunkIndex() int32 {
@@ -581,12 +761,24 @@ const file_inference_v1_inference_proto_rawDesc = "" +
 	"\x0eGetTaskRequest\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\"=\n" +
 	"\x0fGetTaskResponse\x12*\n" +
-	"\x04task\x18\x01 \x01(\v2\x16.inference.v1.api.TaskR\x04task\"\xa1\x01\n" +
+	"\x04task\x18\x01 \x01(\v2\x16.inference.v1.api.TaskR\x04task\"\x12\n" +
+	"\x10GetModelsRequest\"D\n" +
+	"\x11GetModelsResponse\x12/\n" +
+	"\x06models\x18\x01 \x03(\v2\x17.inference.v1.api.ModelR\x06models\"\xa1\x01\n" +
 	"\x04Task\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x124\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x1c.inference.v1.api.TaskStatusR\x06status\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x124\n" +
-	"\x06result\x18\x04 \x01(\v2\x1c.inference.v1.api.TaskResultR\x06result\"Y\n" +
+	"\x06result\x18\x04 \x01(\v2\x1c.inference.v1.api.TaskResultR\x06result\"\xa1\x02\n" +
+	"\x05Model\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\"\n" +
+	"\fprojectTitle\x18\x02 \x01(\tR\fprojectTitle\x12.\n" +
+	"\x12projectDescription\x18\x03 \x01(\tR\x12projectDescription\x12(\n" +
+	"\x0fsecondsPerChunk\x18\x04 \x01(\x05R\x0fsecondsPerChunk\x12*\n" +
+	"\x10targetClassesNum\x18\x05 \x01(\x05R\x10targetClassesNum\x12.\n" +
+	"\x12categoryClassesNum\x18\x06 \x01(\x05R\x12categoryClassesNum\x12\x14\n" +
+	"\x05ready\x18\a \x01(\bR\x05ready\x12\x14\n" +
+	"\x05state\x18\b \x01(\tR\x05state\"Y\n" +
 	"\n" +
 	"TaskResult\x12\x1a\n" +
 	"\bfilename\x18\x01 \x01(\tR\bfilename\x12/\n" +
@@ -605,12 +797,13 @@ const file_inference_v1_inference_proto_rawDesc = "" +
 	"\x0eSTATUS_SUCCESS\x10\x01\x12\x12\n" +
 	"\x0eSTATUS_FAILURE\x10\x02\x12\x12\n" +
 	"\x0eSTATUS_PENDING\x10\x03\x12\x15\n" +
-	"\x11STATUS_PROCESSING\x10\x042\x8e\x02\n" +
+	"\x11STATUS_PROCESSING\x10\x042\xe4\x02\n" +
 	"\x10InferenceService\x12Q\n" +
 	"\bRegister\x12!.inference.v1.api.RegisterRequest\x1a\".inference.v1.api.RegisterResponse\x12W\n" +
 	"\n" +
 	"CreateTask\x12#.inference.v1.api.CreateTaskRequest\x1a$.inference.v1.api.CreateTaskResponse\x12N\n" +
-	"\aGetTask\x12 .inference.v1.api.GetTaskRequest\x1a!.inference.v1.api.GetTaskResponseB6Z4audio-inference-service/gen/inference/v1;inferencev1b\x06proto3"
+	"\aGetTask\x12 .inference.v1.api.GetTaskRequest\x1a!.inference.v1.api.GetTaskResponse\x12T\n" +
+	"\tGetModels\x12\".inference.v1.api.GetModelsRequest\x1a#.inference.v1.api.GetModelsResponseB6Z4audio-inference-service/gen/inference/v1;inferencev1b\x06proto3"
 
 var (
 	file_inference_v1_inference_proto_rawDescOnce sync.Once
@@ -625,7 +818,7 @@ func file_inference_v1_inference_proto_rawDescGZIP() []byte {
 }
 
 var file_inference_v1_inference_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_inference_v1_inference_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_inference_v1_inference_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_inference_v1_inference_proto_goTypes = []any{
 	(TaskStatus)(0),            // 0: inference.v1.api.TaskStatus
 	(*RegisterRequest)(nil),    // 1: inference.v1.api.RegisterRequest
@@ -634,27 +827,33 @@ var file_inference_v1_inference_proto_goTypes = []any{
 	(*CreateTaskResponse)(nil), // 4: inference.v1.api.CreateTaskResponse
 	(*GetTaskRequest)(nil),     // 5: inference.v1.api.GetTaskRequest
 	(*GetTaskResponse)(nil),    // 6: inference.v1.api.GetTaskResponse
-	(*Task)(nil),               // 7: inference.v1.api.Task
-	(*TaskResult)(nil),         // 8: inference.v1.api.TaskResult
-	(*Chunk)(nil),              // 9: inference.v1.api.Chunk
+	(*GetModelsRequest)(nil),   // 7: inference.v1.api.GetModelsRequest
+	(*GetModelsResponse)(nil),  // 8: inference.v1.api.GetModelsResponse
+	(*Task)(nil),               // 9: inference.v1.api.Task
+	(*Model)(nil),              // 10: inference.v1.api.Model
+	(*TaskResult)(nil),         // 11: inference.v1.api.TaskResult
+	(*Chunk)(nil),              // 12: inference.v1.api.Chunk
 }
 var file_inference_v1_inference_proto_depIdxs = []int32{
-	7, // 0: inference.v1.api.CreateTaskResponse.task:type_name -> inference.v1.api.Task
-	7, // 1: inference.v1.api.GetTaskResponse.task:type_name -> inference.v1.api.Task
-	0, // 2: inference.v1.api.Task.status:type_name -> inference.v1.api.TaskStatus
-	8, // 3: inference.v1.api.Task.result:type_name -> inference.v1.api.TaskResult
-	9, // 4: inference.v1.api.TaskResult.chunks:type_name -> inference.v1.api.Chunk
-	1, // 5: inference.v1.api.InferenceService.Register:input_type -> inference.v1.api.RegisterRequest
-	3, // 6: inference.v1.api.InferenceService.CreateTask:input_type -> inference.v1.api.CreateTaskRequest
-	5, // 7: inference.v1.api.InferenceService.GetTask:input_type -> inference.v1.api.GetTaskRequest
-	2, // 8: inference.v1.api.InferenceService.Register:output_type -> inference.v1.api.RegisterResponse
-	4, // 9: inference.v1.api.InferenceService.CreateTask:output_type -> inference.v1.api.CreateTaskResponse
-	6, // 10: inference.v1.api.InferenceService.GetTask:output_type -> inference.v1.api.GetTaskResponse
-	8, // [8:11] is the sub-list for method output_type
-	5, // [5:8] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	9,  // 0: inference.v1.api.CreateTaskResponse.task:type_name -> inference.v1.api.Task
+	9,  // 1: inference.v1.api.GetTaskResponse.task:type_name -> inference.v1.api.Task
+	10, // 2: inference.v1.api.GetModelsResponse.models:type_name -> inference.v1.api.Model
+	0,  // 3: inference.v1.api.Task.status:type_name -> inference.v1.api.TaskStatus
+	11, // 4: inference.v1.api.Task.result:type_name -> inference.v1.api.TaskResult
+	12, // 5: inference.v1.api.TaskResult.chunks:type_name -> inference.v1.api.Chunk
+	1,  // 6: inference.v1.api.InferenceService.Register:input_type -> inference.v1.api.RegisterRequest
+	3,  // 7: inference.v1.api.InferenceService.CreateTask:input_type -> inference.v1.api.CreateTaskRequest
+	5,  // 8: inference.v1.api.InferenceService.GetTask:input_type -> inference.v1.api.GetTaskRequest
+	7,  // 9: inference.v1.api.InferenceService.GetModels:input_type -> inference.v1.api.GetModelsRequest
+	2,  // 10: inference.v1.api.InferenceService.Register:output_type -> inference.v1.api.RegisterResponse
+	4,  // 11: inference.v1.api.InferenceService.CreateTask:output_type -> inference.v1.api.CreateTaskResponse
+	6,  // 12: inference.v1.api.InferenceService.GetTask:output_type -> inference.v1.api.GetTaskResponse
+	8,  // 13: inference.v1.api.InferenceService.GetModels:output_type -> inference.v1.api.GetModelsResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_inference_v1_inference_proto_init() }
@@ -668,7 +867,7 @@ func file_inference_v1_inference_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_inference_v1_inference_proto_rawDesc), len(file_inference_v1_inference_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
