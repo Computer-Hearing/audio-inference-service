@@ -26,7 +26,7 @@ const (
 	// Triton
 	CategoryOutputName    = "category_output"
 	TargetOutputName      = "target_output"
-	DefaultModelName      = "cnn_predict_pipline"
+	DefaultModelName      = "cnn_predict_pipeline_2"
 	RawAudioInputName     = "RAW_AUDIO"
 	RawAudioInputDatatype = "TYPE_UINT8"
 	MaxTritonConcurrency  = 8
