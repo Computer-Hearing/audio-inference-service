@@ -8,14 +8,20 @@ import (
 	"time"
 )
 
+const (
+	taskCountLimit   = 10
+	taskChanCapacity = 20
+	workersCount     = 5
+)
+
 // StartPipeline - отвечает за запуск верокеров, которые задачи выполняют, а также диспетчера, который данные из бд берет
 // связываются через канал.
 func StartPipeline(ctx context.Context, manager modules.TaskManager, predictor modules.FilePredictor) {
 	// Канал, через который Диспетчер передает задачи Воркерам
-	jobsChan := make(chan domain.TaskPayload, 20)
+	jobsChan := make(chan domain.TaskPayload, taskChanCapacity)
 
-	// Запускаем, например, 5 воркеров (горутин)
-	for i := 0; i < 5; i++ {
+	// Запускаем воркеров (горутин)
+	for i := range workersCount {
 		go func() {
 			for job := range jobsChan {
 				if err := predictor.ProcessTask(ctx, job); err != nil {
@@ -40,9 +46,9 @@ func StartPipeline(ctx context.Context, manager modules.TaskManager, predictor m
 				return
 			case <-ticker.C:
 				// Берем пачку до 10 задач за один раз
-				jobs, err := manager.GetAndMarkProcessing(ctx, 10)
+				jobs, err := manager.GetAndMarkProcessing(ctx, taskCountLimit)
 				if err != nil {
-					slog.Error("Failed to get tasks", "err", err.Error())
+					slog.Error("get task error", "err", err.Error())
 					continue
 				}
 

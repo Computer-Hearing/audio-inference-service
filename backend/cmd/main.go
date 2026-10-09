@@ -1,24 +1,26 @@
 package main
 
 import (
+	"audio-inference-service/gen/inference/v1/inferencev1connect"
 	"audio-inference-service/internal/config"
 	"audio-inference-service/internal/modules/catalog"
+	"audio-inference-service/internal/modules/models"
 	"audio-inference-service/internal/modules/predictor"
 	"audio-inference-service/internal/modules/sqlite"
 	"audio-inference-service/internal/modules/taskpipe"
 	"audio-inference-service/internal/modules/triton"
-	"audio-inference-service/internal/server/handlers"
-	"audio-inference-service/internal/server/router"
+	handlers "audio-inference-service/internal/server/connect"
 	"audio-inference-service/pkg"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"connectrpc.com/connect"
 )
 
 func main() {
@@ -34,7 +36,7 @@ func main() {
 
 	printConfig(cfg, logger)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	db, err := pkg.SqliteOpen(cfg.DBPath, nil)
 	if err != nil {
@@ -46,7 +48,7 @@ func main() {
 
 	tritonClient, err := triton.NewTritonClient(triton.DefaultConfig(cfg.TritonAddr))
 	if err != nil {
-		logger.Error("failed to create triton client", "err", err.Error())
+		logger.Error("triton client error", "error", err.Error())
 		os.Exit(1)
 	}
 	defer tritonClient.Close()
@@ -55,27 +57,49 @@ func main() {
 		logger.Error("failed to connect to triton", "addr", cfg.TritonAddr, "err", err.Error())
 		os.Exit(1)
 	}
-	logger.Info("connected to triton", "addr", cfg.TritonAddr)
+	logger.Info("triton connect sucess", "addr", cfg.TritonAddr)
 
-	taskManager := sqlite.NewSQLiteTaskManager(db)
-	predict := &predictor.Predictor{
+	modelCatalog := catalog.New(tritonClient, 30*time.Second)
+
+	// хранение моделей
+	storage := models.NewStorage()
+	syncer := models.NewSyncer(storage, modelCatalog, 5*time.Second, logger)
+	go func() {
+		syncer.Run(ctx)
+	}()
+
+	taskManager := sqlite.New(db)
+	predict := predictor.New(&predictor.Options{
 		TritonConnector: tritonClient,
 		TaskManager:     taskManager,
-	}
+	})
 
 	// Запускаем воркеры и диспетчера задач
 	taskpipe.StartPipeline(ctx, taskManager, predict)
 
-	modelCatalog := catalog.NewTritonCatalog(tritonClient, 30*time.Second)
-	handlers := handlers.New(handlers.Options{
-		TaskLoader: taskManager, Catalog: modelCatalog, Models: taskManager, Logger: logger,
+	h := handlers.New(&handlers.Options{
+		TaskLoader:   taskManager,
+		Catalog:      modelCatalog,
+		ModelStorage: storage,
+		Logger:       logger,
 	})
+	path, connectHandler := inferencev1connect.NewInferenceServiceHandler(h,
+		connect.WithInterceptors(handlers.NewUsernameInterceptor()),
+		connect.WithReadMaxBytes(4<<20+64<<10),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(path, connectHandler)
+
 	srv := &http.Server{
 		Addr:         cfg.HTTPAddr,
-		Handler:      router.New(logger, handlers, cfg.APIPrefix),
+		Handler:      mux,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 5 * time.Minute,
+		Protocols:    &http.Protocols{},
 	}
+	srv.Protocols.SetHTTP1(true)
+	srv.Protocols.SetUnencryptedHTTP2(true)
 
 	go func() {
 		logger.Info("http server started", "addr", cfg.HTTPAddr)
@@ -88,7 +112,7 @@ func main() {
 	<-ctx.Done()
 	logger.Info("shutting down http server")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown failed", "err", err.Error())
@@ -97,7 +121,7 @@ func main() {
 
 func printConfig(cfg *config.Config, logger *slog.Logger) {
 	if cfg == nil {
-		fmt.Println("config is nil")
+		logger.Debug("config is nil")
 		return
 	}
 
@@ -106,6 +130,5 @@ func printConfig(cfg *config.Config, logger *slog.Logger) {
 		slog.String("LogLevel", cfg.LogLevel),
 		slog.String("HTTP_ADDR", cfg.HTTPAddr),
 		slog.String("DB_PATH", cfg.DBPath),
-		slog.String("TRITON_ADDR", cfg.TritonAddr),
-		slog.String("API_PREFIX", cfg.APIPrefix))
+		slog.String("TRITON_ADDR", cfg.TritonAddr))
 }
