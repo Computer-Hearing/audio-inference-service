@@ -13,7 +13,6 @@ import (
 	"audio-inference-service/pkg"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -37,7 +36,7 @@ func main() {
 
 	printConfig(cfg, logger)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	db, err := pkg.SqliteOpen(cfg.DBPath, nil)
 	if err != nil {
@@ -113,7 +112,7 @@ func main() {
 	<-ctx.Done()
 	logger.Info("shutting down http server")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown failed", "err", err.Error())
@@ -122,7 +121,7 @@ func main() {
 
 func printConfig(cfg *config.Config, logger *slog.Logger) {
 	if cfg == nil {
-		fmt.Println("config is nil")
+		logger.Debug("config is nil")
 		return
 	}
 
