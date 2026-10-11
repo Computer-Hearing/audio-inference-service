@@ -16,7 +16,7 @@ const (
 
 // StartPipeline - отвечает за запуск верокеров, которые задачи выполняют, а также диспетчера, который данные из бд берет
 // связываются через канал.
-func StartPipeline(ctx context.Context, manager modules.TaskManager, predictor modules.FilePredictor) {
+func StartPipeline(ctx context.Context, logger *slog.Logger, manager modules.TaskManager, predictor modules.FilePredictor) {
 	// Канал, через который Диспетчер передает задачи Воркерам
 	jobsChan := make(chan domain.TaskPayload, taskChanCapacity)
 
@@ -24,13 +24,16 @@ func StartPipeline(ctx context.Context, manager modules.TaskManager, predictor m
 	for i := range workersCount {
 		go func() {
 			for job := range jobsChan {
+				logger.Debug("proccess task", "task_id", job.TaskID)
+
 				if err := predictor.ProcessTask(ctx, job); err != nil {
 					// Логируем ошибку, задача либо останется в failure,
 					// либо подхватится механизмом зависших задач (по таймауту)
-					slog.Error("Failed to process task", "task_id", job.TaskID, "err", err.Error())
+					logger.Error("failed to process task", "task_id", job.TaskID, "err", err.Error())
 				}
+
 			}
-			slog.Debug("Channel closed", "worker_id", i+1)
+			logger.Debug("channel closed", "worker_id", i+1)
 		}()
 	}
 
@@ -43,12 +46,13 @@ func StartPipeline(ctx context.Context, manager modules.TaskManager, predictor m
 		for {
 			select {
 			case <-ctx.Done():
+				logger.Debug("scheduler: context done")
 				return
 			case <-ticker.C:
 				// Берем пачку до 10 задач за один раз
 				jobs, err := manager.GetAndMarkProcessing(ctx, taskCountLimit)
 				if err != nil {
-					slog.Error("get task error", "err", err.Error())
+					logger.Error("get task error", "err", err.Error())
 					continue
 				}
 

@@ -68,7 +68,7 @@ func (h *Handlers) CreateTask(
 
 	// генерируем таск id
 	taskID := domain.GenerateTaskID(username.String())
-	h.logger.Info("models", slog.Any("slice", h.modelStorage.Names()))
+
 	modelConfig, ok := h.modelStorage.Get(c.Msg.ModelName)
 	if !ok {
 		return nil, pkg.ConnectError(
@@ -83,13 +83,17 @@ func (h *Handlers) CreateTask(
 		SecondsPerChunk: modelConfig.SecondsPerChunk,
 	})
 	if err != nil {
+		h.logger.Error("split audio chunks", "error", err.Error)
 		return nil, pkg.ConnectError(fmt.Errorf("audio split: %w", err))
 	}
+	h.logger.Debug("audio chunks splitted", "task_id", taskID.String(), "chunks len", (len(ch.Layers[0].Chunks) + len(ch.Layers[1].Chunks)))
 
 	payload := domain.AudioTaskPayload{ModelName: c.Msg.ModelName, Chunks: *ch}
 	if err := h.taskLoader.CreateTask(ctx, username, taskID, payload); err != nil {
+		h.logger.Error("create task error", "task_id", taskID.String(), "error", err.Error())
 		return nil, pkg.ConnectError(fmt.Errorf("create task: %w", err))
 	}
+	h.logger.Info("create task successful", "task_id", taskID.String(), "username", username.String())
 
 	// Отдаем ответ
 	return &connect.Response[v1.CreateTaskResponse]{

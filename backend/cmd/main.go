@@ -57,13 +57,13 @@ func main() {
 		logger.Error("failed to connect to triton", "addr", cfg.TritonAddr, "err", err.Error())
 		os.Exit(1)
 	}
-	logger.Info("triton connect sucess", "addr", cfg.TritonAddr)
+	logger.Info("triton connect success", "addr", cfg.TritonAddr)
 
 	modelCatalog := catalog.New(tritonClient, 30*time.Second)
 
 	// хранение моделей
 	storage := models.NewStorage()
-	syncer := models.NewSyncer(storage, modelCatalog, 5*time.Second, logger)
+	syncer := models.NewSyncer(storage, modelCatalog, 5*time.Minute, logger)
 	go func() {
 		syncer.Run(ctx)
 	}()
@@ -72,10 +72,11 @@ func main() {
 	predict := predictor.New(&predictor.Options{
 		TritonConnector: tritonClient,
 		TaskManager:     taskManager,
+		Logger:          logger,
 	})
 
 	// Запускаем воркеры и диспетчера задач
-	taskpipe.StartPipeline(ctx, taskManager, predict)
+	taskpipe.StartPipeline(ctx, logger, taskManager, predict)
 
 	h := handlers.New(&handlers.Options{
 		TaskLoader:   taskManager,
