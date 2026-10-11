@@ -84,7 +84,7 @@ func (s *Syncer) refresh(ctx context.Context) error {
 		fresh[m.Name] = cfg
 	}
 	s.storage.ReplaceAll(fresh)
-	s.logger.Info("models synced", "count", len(fresh))
+	s.logger.Debug("models synced", "count", len(fresh))
 	return nil
 }
 

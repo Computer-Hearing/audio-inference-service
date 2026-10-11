@@ -10,7 +10,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"math"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -18,11 +20,13 @@ import (
 type Predictor struct {
 	tritonConnector *triton.TritonClient
 	taskManager     modules.TaskManager
+	logger          *slog.Logger
 }
 
 type Options struct {
 	TritonConnector *triton.TritonClient
 	TaskManager     modules.TaskManager
+	Logger          *slog.Logger
 }
 
 func New(opts *Options) *Predictor {
@@ -32,21 +36,29 @@ func New(opts *Options) *Predictor {
 	return &Predictor{
 		tritonConnector: opts.TritonConnector,
 		taskManager:     opts.TaskManager,
+		logger:          opts.Logger,
 	}
 }
 
 func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) error {
+	taskID := job.TaskID
+
 	modelName := job.Payload.ModelName
 	if modelName == "" {
 		return fmt.Errorf("model name is required")
 	}
 
-	// сам inference
+	// сам inference + замер времени всего инференса + вывод в лог этой инфы
+	start := time.Now()
 	result, inferErr := processAudioChunks(ctx, p.tritonConnector, modelName, job.Payload.Chunks)
+	end := time.Since(start)
+
+	logResult(p.logger, result, taskID.String(), end.String(), inferErr)
 
 	// Обновляем статус в БД
 	if inferErr != nil {
 		if err := p.taskManager.StatusFailure(ctx, job.TaskID, result); err != nil {
+			// TODO: плохо сделано, если была ошибка в инференсе и ошибка в бд, то выграет ошибка бд, хотя на нее тут в принципе похуй в отлчии от ошибки инференса
 			return fmt.Errorf("set failure status: %w", err)
 		}
 		return fmt.Errorf("audio processing failed: %w", inferErr)
@@ -200,4 +212,11 @@ func bytesToFloat32(raw []byte) []float32 {
 	}
 
 	return result
+}
+
+func logResult(logger *slog.Logger, chunks *domain.FileInferenceResult, taskID, inferenceTime string, inferenceErr error) {
+	if inferenceErr != nil {
+		logger.Error("inference error", "task_id", taskID, "error", inferenceErr.Error())
+	}
+	logger.Info("inference success", "task_id", taskID, "chunk len", len(chunks.Chunks), "inference time", inferenceTime, "filename", chunks.Filename)
 }
