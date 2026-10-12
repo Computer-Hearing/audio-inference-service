@@ -93,3 +93,92 @@ export function computeBars({ samples, sampleRate, duration }, chunkSeconds) {
 
   return bars;
 }
+
+// -----------------------------------------------------------------------
+// Скачивание фрагмента (чанка) файла.
+//
+// Для гистограммы файл декодируется "облегчённо" (моно, 22050 Гц) — для
+// скачивания так нельзя, пользователь должен получить звук в нормальном
+// качестве. Поэтому для скачивания файл декодируется отдельно: все каналы,
+// 44100 Гц (частота, на которой работает и сама модель в Triton).
+// Нужный отрезок вырезается и сохраняется в WAV — формат без сжатия,
+// который открывается любым плеером и который браузер умеет собрать сам,
+// без сторонних библиотек.
+// -----------------------------------------------------------------------
+const EXPORT_SAMPLE_RATE = 44100;
+
+/**
+ * Декодирует файл в полном качестве (каналы сохраняются).
+ * @returns {Promise<AudioBuffer>}
+ */
+export async function decodeAudioFull(file) {
+  const AudioCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ctx = new AudioCtx(1, 1, EXPORT_SAMPLE_RATE);
+  return ctx.decodeAudioData(await file.arrayBuffer());
+}
+
+/**
+ * Вырезает из AudioBuffer отрезок [start, end) секунд и упаковывает его
+ * в WAV (16 бит PCM, все каналы).
+ * @returns {Blob}
+ */
+export function encodeWavSegment(buffer, start, end) {
+  const sampleRate = buffer.sampleRate;
+  const channels = buffer.numberOfChannels;
+  const from = Math.max(0, Math.min(buffer.length, Math.round(start * sampleRate)));
+  const to = Math.max(from, Math.min(buffer.length, Math.round(end * sampleRate)));
+  const frames = to - from;
+
+  const bytesPerSample = 2;
+  const dataSize = frames * channels * bytesPerSample;
+  const view = new DataView(new ArrayBuffer(44 + dataSize));
+
+  const writeString = (offset, s) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
+
+  // Заголовок WAV (RIFF): 44 байта с описанием формата
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true); // размер блока fmt
+  view.setUint16(20, 1, true); // 1 = PCM, без сжатия
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * channels * bytesPerSample, true); // байт в секунду
+  view.setUint16(32, channels * bytesPerSample, true); // байт на один отсчёт всех каналов
+  view.setUint16(34, bytesPerSample * 8, true); // бит на отсчёт
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  // Сами отсчёты: каналы чередуются (Л, П, Л, П, ...), дробное число
+  // от -1 до 1 переводится в целое 16-битное от -32768 до 32767
+  const data = [];
+  for (let c = 0; c < channels; c++) data.push(buffer.getChannelData(c));
+  let offset = 44;
+  for (let i = from; i < to; i++) {
+    for (let c = 0; c < channels; c++) {
+      const s = Math.max(-1, Math.min(1, data[c][i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      offset += bytesPerSample;
+    }
+  }
+
+  return new Blob([view], { type: 'audio/wav' });
+}
+
+/**
+ * Отдаёт Blob пользователю как скачиваемый файл.
+ */
+export function saveBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Ссылку освобождаем не сразу — некоторые браузеры начинают скачивание асинхронно
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
