@@ -9,14 +9,12 @@
 // чанк больше не заканчивается посреди столбца. Направляющие линии от
 // границ чанков вверх, в область графика, ложатся ровно в щели между
 // столбцами.
+//
+// Плашки чанков кликабельны: клик выбирает чанк, и Main.jsx показывает
+// под диаграммой карточку с подробностями о нём (ChunkDetails.jsx).
 import { useEffect, useMemo, useRef } from 'react';
 import { computeBars } from '../audio.js';
-
-const CATEGORY = { 0: 'car', 1: 'emv', 2: 'motorcycle', 3: 'tram', 4: 'truck' };
-const TARGET = {
-  0: 'acceleration', 1: 'bell', 2: 'braking', 3: 'horn',
-  4: 'idling', 5: 'passing', 6: 'siren',
-};
+import { CATEGORY_LABELS, TARGET_LABELS, argmaxIndex, chunkKey, chunkRange } from '../chunks.js';
 
 // Цветовая карта амплитуды: тихо (тёмно-синий) → громко (красный),
 // стандартная для аудио-визуализаторов логика "холодный → тёплый".
@@ -55,13 +53,6 @@ function rgb([r, g, b], factor = 1) {
   return `rgb(${r * factor}, ${g * factor}, ${b * factor})`;
 }
 
-function argmaxIndex(arr) {
-  if (!arr || !arr.length) return -1;
-  let best = 0;
-  for (let i = 1; i < arr.length; i++) if (arr[i] > arr[best]) best = i;
-  return best;
-}
-
 // Схлопывает подряд идущие чанки с одинаковым предсказанием (категория +
 // звук) в один визуальный блок — если модель несколько чанков подряд
 // выдаёт одно и то же, незачем рисовать это как несколько одинаковых
@@ -82,30 +73,28 @@ function mergeGroups(ranges, chunksArr) {
     if (sameAsLast) {
       last.end = end;
       last.count += 1;
+      last.items.push(ch);
     } else {
-      groups.push({ start, end, catIdx, tgtIdx, error: isError, errorMessage: ch.errorMessage, count: 1 });
+      groups.push({
+        start, end, catIdx, tgtIdx,
+        error: isError, errorMessage: ch.errorMessage, count: 1,
+        // Исходные чанки блока — нужны, чтобы по клику открыть подробности
+        items: [ch],
+      });
     }
   });
   return groups;
 }
 
-// -----------------------------------------------------------------------
-// Границы чанков по времени (нужны только для рядов чанков ниже графика).
-// Правило (согласовано с бэкендом, см. internal/modules/audio/splitter.go):
-//  - базовый слой (offset=0): чанки фиксированного размера chunkSeconds,
-//    последний чанк может быть короче (хвост длительностью duration % chunkSeconds,
-//    если этот хвост длится дольше ~0.5s — иначе бэкенд его просто отбрасывает).
-//  - слои со сдвигом (offset=1s и т.д.): те же чанки фиксированного размера,
-//    считаются от отметки offset, хвост НЕ создаётся.
-// Опираемся на chunkIndex и offset, которые уже возвращает бэкенд.
-// -----------------------------------------------------------------------
-function chunkRange(offset, chunkIndex, chunkSeconds, duration) {
-  const start = offset + chunkIndex * chunkSeconds;
-  const end = Math.min(duration, start + chunkSeconds);
-  return { start, end: Math.max(start, end) };
-}
-
-export default function Waveform({ audioData, chunks, duration: playerDuration, currentTime, chunkSeconds }) {
+export default function Waveform({
+  audioData,
+  chunks,
+  duration: playerDuration,
+  currentTime,
+  chunkSeconds,
+  selectedKey,
+  onSelectChunk,
+}) {
   const canvasRef = useRef(null);
 
   // Длительность берём из декодированного файла — по ней же считаются
@@ -185,19 +174,32 @@ export default function Waveform({ audioData, chunks, duration: playerDuration, 
         const left = (g.start / duration) * 100;
         const width = ((g.end - g.start) / duration) * 100;
         const isActive = currentTime >= g.start && currentTime < g.end;
+        const isSelected = g.items.some((ch) => chunkKey(ch) === selectedKey);
 
         return (
           <div
             key={`${extraClass}-${i}`}
-            className={`chunk-box${isActive ? ' active' : ''}${g.error ? ' has-error' : ''}`}
+            className={
+              `chunk-box${isActive ? ' active' : ''}${isSelected ? ' selected' : ''}` +
+              `${g.error ? ' has-error' : ''}`
+            }
             style={{ left: `${left}%`, width: `calc(${width}% - 1px)` }}
-            title={g.error ? g.errorMessage : undefined}
+            title={g.error ? g.errorMessage : 'show chunk details'}
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelectChunk(g.items)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelectChunk(g.items);
+              }
+            }}
           >
             <div className="chunk-box-category">
-              {CATEGORY[g.catIdx] || '?'}
+              {CATEGORY_LABELS[g.catIdx] || '?'}
               {g.count > 1 && !g.error && <span className="chunk-box-count"> ×{g.count}</span>}
             </div>
-            <div className="chunk-box-target">{TARGET[g.tgtIdx] || '?'}</div>
+            <div className="chunk-box-target">{TARGET_LABELS[g.tgtIdx] || '?'}</div>
             {g.error && <div className="chunk-box-error">error</div>}
           </div>
         );

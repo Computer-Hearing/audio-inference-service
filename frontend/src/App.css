@@ -297,10 +297,23 @@ h1 small {
   overflow: hidden;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
+.chunk-box {
+  cursor: pointer;
+}
+.chunk-box:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #e0e0e0;
+}
 .chunk-box.active {
   background: rgba(255, 255, 255, 0.09);
   border-color: #ffffff;
   color: #ffffff;
+}
+/* Выбранный чанк (открыта карточка подробностей) — белая линия снизу,
+   как у кнопок, чтобы не путать с подсветкой текущего воспроизведения */
+.chunk-box.selected {
+  color: #ffffff;
+  box-shadow: inset 0 -2px 0 #ffffff;
 }
 .chunk-box.has-error {
   opacity: 0.35;
@@ -319,6 +332,165 @@ h1 small {
 .chunk-box-error {
   color: #ff6b5a;
   font-size: 8px;
+}
+
+/* ---------------------------------------------------------------------
+   Карточка подробностей о чанке — появляется под диаграммой по клику на
+   плашку. Кнопки действий (play / wav / закрыть) — в правом верхнем углу.
+   Распределение вероятностей — монохромные полоски, как прогресс в плеере;
+   белым выделен только самый вероятный класс.
+   --------------------------------------------------------------------- */
+.chunk-details {
+  position: relative;
+}
+
+.chunk-details-actions {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.chunk-details-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.chunk-details-close {
+  border-bottom: none;
+  padding: 6px;
+  color: #777;
+}
+.chunk-details-icon {
+  width: 14px;
+  height: 14px;
+}
+.chunk-details-icon-fill {
+  fill: currentColor;
+}
+
+.chunk-details-time {
+  font-size: 13px;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chunk-details-siblings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+.chunk-details-sibling {
+  font-size: 13px;
+  padding: 2px 4px;
+}
+.chunk-details-sibling.current {
+  color: #ffffff;
+  border-bottom-color: #ffffff;
+}
+
+.chunk-details-error {
+  margin-top: 16px;
+  word-break: break-word;
+}
+
+.chunk-details-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  margin-top: 22px;
+}
+.chunk-details-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.chunk-details-fact .muted {
+  font-size: 13px;
+}
+.chunk-details-fact-value {
+  font-size: 22px;
+  color: #ffffff;
+  letter-spacing: 1px;
+}
+.chunk-details-fact-pct {
+  font-size: 15px;
+  color: #aaa;
+  font-variant-numeric: tabular-nums;
+}
+
+.chunk-details-dists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-top: 22px;
+}
+.chunk-dist-title {
+  font-size: 11px;
+  color: #555;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.chunk-dist-row {
+  display: grid;
+  grid-template-columns: 104px 1fr 56px 46px;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #888;
+  line-height: 1.9;
+}
+.chunk-dist-row.top {
+  color: #ffffff;
+}
+.chunk-dist-bar {
+  position: relative;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.chunk-dist-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+}
+.chunk-dist-row.top .chunk-dist-bar-fill {
+  background: #ffffff;
+}
+.chunk-dist-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.chunk-dist-logit {
+  text-align: right;
+  font-size: 11px;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
+
+.chunk-details-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+}
+.chunk-details-meta span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------
@@ -486,6 +658,23 @@ h1 small {
   }
   .chunk-box {
     font-size: 9px;
+  }
+
+  .chunk-details-actions {
+    position: static;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+  }
+  .chunk-details-dists {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .chunk-details-summary {
+    gap: 18px;
+  }
+  .chunk-dist-row {
+    grid-template-columns: 92px 1fr 52px 40px;
+    gap: 8px;
   }
 
   .container.has-player {

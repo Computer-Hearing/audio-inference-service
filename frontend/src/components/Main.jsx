@@ -1,5 +1,5 @@
 // src/components/Main.jsx
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getModels,
   createTask,
@@ -9,8 +9,10 @@ import {
   modelChunkSeconds,
   MAX_AUDIO_BYTES,
 } from '../api.js';
-import { decodeAudio } from '../audio.js';
+import { decodeAudio, decodeAudioFull, encodeWavSegment, saveBlob } from '../audio.js';
+import { chunkKey } from '../chunks.js';
 import Waveform from './Waveform.jsx';
+import ChunkDetails from './ChunkDetails.jsx';
 import Player from './Player.jsx';
 
 function truncateName(name, max = 40) {
@@ -21,6 +23,15 @@ function truncateName(name, max = 40) {
 
 // Простая, незамысловатая иконка — звуковая дорожка (эквалайзер),
 // тематически про аудио, без лишней "сферической" декорации.
+// Имя скачиваемого фрагмента: <имя файла>_<слой>_chunk<номер>_<начало>-<конец>s.wav,
+// например street_base_chunk03_6.0-8.0s.wav
+function chunkFileName(sourceName, chunk, start, end) {
+  const base = (sourceName || 'audio').replace(/\.[^.]+$/, '').replace(/[^\w\-]+/g, '_');
+  const layer = chunk.offset ? `offset${chunk.offset}s` : 'base';
+  const index = String(chunk.chunkIndex).padStart(2, '0');
+  return `${base}_${layer}_chunk${index}_${start.toFixed(1)}-${end.toFixed(1)}s.wav`;
+}
+
 function UploadIcon() {
   return (
     <svg
@@ -76,6 +87,10 @@ export default function Main() {
   // может переключить модель для *следующего* анализа, не ломая
   // отображение уже готового результата.
   const [analyzedModel, setAnalyzedModel] = useState(null);
+  // Выбранный чанк (по клику на плашку) и все чанки его блока — если
+  // несколько одинаковых чанков подряд схлопнуты в одну плашку.
+  // { key, items }, где key — chunkKey выбранного чанка.
+  const [selection, setSelection] = useState(null);
 
   const [audioUrl, setAudioUrl] = useState(null);
   const [duration, setDuration] = useState(0);
@@ -90,6 +105,12 @@ export default function Main() {
   // Номер текущего файла — чтобы результат декодирования предыдущего
   // файла (если пользователь быстро выбрал другой) не перезаписал новый.
   const decodeIdRef = useRef(0);
+  // Файл, декодированный в полном качестве для скачивания чанков:
+  // { file, promise }. Декодируется один раз, при первом скачивании.
+  const fullAudioRef = useRef(null);
+  // Конец фрагмента, который проигрывается кнопкой "play" в карточке чанка:
+  // дойдя до него, воспроизведение останавливается.
+  const segmentEndRef = useRef(null);
 
   const handleRaw = (info) => setRawLog((prev) => [...prev, info]);
 
@@ -118,7 +139,14 @@ export default function Main() {
       return;
     }
     const tick = () => {
-      if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
+      const el = audioRef.current;
+      if (el) {
+        if (segmentEndRef.current !== null && el.currentTime >= segmentEndRef.current) {
+          segmentEndRef.current = null;
+          el.pause();
+        }
+        setCurrentTime(el.currentTime);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -145,6 +173,8 @@ export default function Main() {
     setAudioData(null);
     setChunks(null);
     setAnalyzedModel(null);
+    setSelection(null);
+    fullAudioRef.current = null;
     setError(null);
     setState('idle');
     setCurrentTime(0);
@@ -165,6 +195,7 @@ export default function Main() {
     setError(null);
     setRawLog([]);
     setChunks(null);
+    setSelection(null);
     setState('analyzing');
     const modelUsed = currentModel;
     try {
@@ -206,6 +237,7 @@ export default function Main() {
   const handlePlayPause = () => {
     const el = audioRef.current;
     if (!el) return;
+    segmentEndRef.current = null;
     if (el.paused) el.play();
     else el.pause();
   };
@@ -213,6 +245,7 @@ export default function Main() {
   const handleSeek = (t) => {
     const el = audioRef.current;
     if (!el) return;
+    segmentEndRef.current = null;
     el.currentTime = t;
     setCurrentTime(t);
   };
@@ -225,6 +258,8 @@ export default function Main() {
     setAudioData(null);
     setChunks(null);
     setAnalyzedModel(null);
+    setSelection(null);
+    fullAudioRef.current = null;
     setState('idle');
     setError(null);
     setCurrentTime(0);
@@ -236,7 +271,54 @@ export default function Main() {
     fileInputRef.current.click();
   };
 
+  // Клик по плашке: выбрать первый чанк блока; повторный клик по уже
+  // выбранному блоку — закрыть карточку.
+  const handleSelectChunk = (items) => {
+    if (!items || !items.length) return;
+    setSelection((prev) =>
+      prev && items.some((ch) => chunkKey(ch) === prev.key)
+        ? null
+        : { key: chunkKey(items[0]), items }
+    );
+  };
+
+  const handleCloseDetails = useCallback(() => setSelection(null), []);
+
+  // Прослушать только выбранный фрагмент
+  const handlePlaySegment = (start, end) => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.currentTime = start;
+    setCurrentTime(start);
+    segmentEndRef.current = end;
+    el.play();
+  };
+
+  // Скачать фрагмент: файл декодируется в полном качестве (один раз на
+  // файл), нужный отрезок вырезается и сохраняется в WAV.
+  const handleDownloadChunk = async (chunk, start, end) => {
+    if (!file) return;
+    if (!fullAudioRef.current || fullAudioRef.current.file !== file) {
+      fullAudioRef.current = { file, promise: decodeAudioFull(file) };
+    }
+    let buffer;
+    try {
+      buffer = await fullAudioRef.current.promise;
+    } catch {
+      fullAudioRef.current = null;
+      throw new Error('this audio format cannot be decoded by the browser');
+    }
+    const blob = encodeWavSegment(buffer, start, end);
+    saveBlob(blob, chunkFileName(file.name, chunk, start, end));
+  };
+
   const chunkSeconds = modelChunkSeconds(analyzedModel);
+  // Шкала времени — та же, что у Waveform: длительность декодированного
+  // файла, а пока его нет — длительность из <audio>.
+  const timeline = audioData?.duration || duration;
+  const selectedChunk = selection
+    ? (chunks || []).find((ch) => chunkKey(ch) === selection.key) || null
+    : null;
 
   return (
     <>
@@ -339,6 +421,24 @@ export default function Main() {
             duration={duration}
             currentTime={currentTime}
             chunkSeconds={chunkSeconds}
+            selectedKey={selection?.key}
+            onSelectChunk={handleSelectChunk}
+          />
+        )}
+
+        {/* Подробности о выбранном чанке — появляются по клику на плашку */}
+        {selectedChunk && (
+          <ChunkDetails
+            chunk={selectedChunk}
+            siblings={selection.items}
+            chunkSeconds={chunkSeconds}
+            duration={timeline}
+            fileName={file?.name}
+            modelName={modelId(analyzedModel)}
+            onSelect={(ch) => setSelection((prev) => ({ ...prev, key: chunkKey(ch) }))}
+            onClose={handleCloseDetails}
+            onPlay={handlePlaySegment}
+            onDownload={handleDownloadChunk}
           />
         )}
 
