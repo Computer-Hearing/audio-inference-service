@@ -191,6 +191,10 @@ h1 small {
   word-break: break-all;
   text-align: center;
 }
+.upload-limit {
+  font-size: 12px;
+  margin-top: -10px;
+}
 
 .model-arrow {
   position: absolute;
@@ -315,51 +319,6 @@ h1 small {
 .chunk-box-error {
   color: #ff6b5a;
   font-size: 8px;
-}
-
-/* ---------------------------------------------------------------------
-   История — карточки с кратким итогом по каждому файлу, строго по тому,
-   что реально отдаёт API (без даты и модели — бэкенд их не хранит).
-   --------------------------------------------------------------------- */
-.history-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.history-item {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 14px;
-}
-.history-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.history-item-filename {
-  font-size: 15px;
-  color: #e0e0e0;
-  word-break: break-all;
-}
-.history-item-meta {
-  font-size: 12px;
-  margin-top: 4px;
-}
-.history-item-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-.history-tag {
-  font-size: 11px;
-  color: #ccc;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-.history-tag-target {
-  color: #888;
-  border-color: rgba(255, 255, 255, 0.06);
 }
 
 /* ---------------------------------------------------------------------

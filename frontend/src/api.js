@@ -1,161 +1,185 @@
+// src/api.js
+//
+// Бэкенд переписан на connect-rpc: вместо REST-ручек /api/v1/* теперь один
+// сервис inference.v1.api.InferenceService (контракт —
+// contracts/inference/v1/inference.proto). Клиентский код сгенерирован в
+// src/gen командой `make generate-js` из папки contracts/.
+//
+// Важно: используем только inference_pb.js — в protobuf-es v2 описание
+// сервиса (InferenceService) генерируется прямо туда. Файл
+// inference_connect.js от плагина protoc-gen-connect-es рассчитан на старый
+// @connectrpc/connect v1 и с v2 несовместим, поэтому не импортируется.
+import { createClient, ConnectError, Code } from '@connectrpc/connect';
+import { createConnectTransport } from '@connectrpc/connect-web';
+import { toJson } from '@bufbuild/protobuf';
+import {
+  InferenceService,
+  TaskStatus,
+  CreateTaskResponseSchema,
+  GetTaskResponseSchema,
+} from './gen/inference/v1/inference_pb.js';
+
+// Запросы идут на <BASE_URL>/inference.v1.api.InferenceService/<Method>,
+// например /inference/inference.v1.api.InferenceService/GetModels.
 const API_PREFIX = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-function safeParse(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+const transport = createConnectTransport({
+  baseUrl: API_PREFIX || '/',
+  // Бинарный protobuf вместо JSON: аудио уходит полем bytes, и в JSON оно
+  // раздувалось бы на ~33% из-за base64 — упёрлись бы в лимит бэкенда раньше.
+  useBinaryFormat: true,
+  // Сессия держится на HttpOnly-куке username — её нужно отправлять
+  // с каждым запросом, как раньше делал credentials: 'include'.
+  fetch: (input, init) => globalThis.fetch(input, { ...init, credentials: 'include' }),
+});
+
+const client = createClient(InferenceService, transport);
+
+// Бэкенд читает не больше 4 MiB + 64 KiB на сообщение
+// (connect.WithReadMaxBytes в backend/cmd/main.go) — 64 KiB это запас под
+// остальные поля запроса, сам файл должен укладываться в 4 MiB.
+export const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+
+// Текст ошибки без префикса "[code]", который ConnectError добавляет в message.
+function errorText(e, fallback) {
+  if (e instanceof ConnectError) return e.rawMessage || Code[e.code] || fallback;
+  return (e && e.message) || fallback;
 }
 
-// Бэкенд отдаёт ошибки как { "error": "..." } (см. pkg.SendError / pkg.jsonError),
-// но некоторые старые места ожидали { "message": "..." } — поддерживаем оба
-// варианта, чтобы не потерять текст ошибки, если формат вдруг изменится.
-function extractErrorMessage(body, fallback) {
-  if (body && typeof body === 'object') {
-    return body.error || body.message || fallback;
-  }
-  if (typeof body === 'string' && body.trim()) return body;
-  return fallback;
+function errorLog(method, e) {
+  const err = ConnectError.from(e);
+  return {
+    url: method,
+    status: Code[err.code] || 'error',
+    body: { code: Code[err.code], message: err.rawMessage },
+  };
 }
 
 // -----------------------------------------------------------------------
 // Сессия пользователя.
-// По требованиям бэкенда имя пользователя больше не вводится вручную:
-// POST /api/v1/register с пустым username генерирует анонимное имя вида
-// "Anonim-XXXXXXXXXXXXX-1234567890" (см. pkg.UsernameGenerator) и кладёт его
-// в HttpOnly-куку. Кука httpOnly — прочитать её из JS нельзя и не нужно,
-// достаточно, что она есть у браузера и подставляется в credentials: 'include'.
+// Register с пустым username генерирует анонимное имя вида
+// "Anonim-XXXXXXXXXXXXX-1234567890" и кладёт его в HttpOnly-куку.
+// Прочитать её из JS нельзя и не нужно — достаточно, что браузер её хранит.
 //
-// Если кука уже существует, бэкенд отвечает 409 Conflict — это не ошибка,
-// а сигнал "сессия уже есть", поэтому обрабатываем его как успех.
+// Если кука уже существует, бэкенд отвечает кодом AlreadyExists (раньше
+// это был 409 Conflict) — это не ошибка, а сигнал "сессия уже есть".
 // -----------------------------------------------------------------------
 export async function ensureSession() {
   try {
-    const res = await fetch(`${API_PREFIX}/api/v1/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ username: '' }),
-    });
-
-    if (res.ok || res.status === 409) return true;
-
-    const text = await res.text().catch(() => '');
-    console.warn('ensureSession: unexpected response', res.status, text);
-    return false;
+    await client.register({ username: '' });
+    return true;
   } catch (e) {
+    if (e instanceof ConnectError && e.code === Code.AlreadyExists) return true;
     console.warn('ensureSession: request failed', e);
     return false;
   }
 }
 
-// Универсальный fetch с авто-восстановлением сессии: если бэкенд вдруг
-// ответил 401 (кука не пришла/протухла) — один раз пытаемся зарегистрироваться
-// заново и повторяем запрос.
-async function authorizedFetch(url, options, _retried = false) {
-  const res = await fetch(url, { credentials: 'include', ...options });
-  if (res.status === 401 && !_retried) {
-    const recovered = await ensureSession();
-    if (recovered) return authorizedFetch(url, options, true);
+// Вызов с авто-восстановлением сессии: если бэкенд ответил Unauthenticated
+// (кука не пришла/протухла) — один раз регистрируемся заново и повторяем.
+async function authorized(call) {
+  try {
+    return await call();
+  } catch (e) {
+    if (e instanceof ConnectError && e.code === Code.Unauthenticated) {
+      const recovered = await ensureSession();
+      if (recovered) return call();
+    }
+    throw e;
   }
-  return res;
 }
 
 // -----------------------------------------------------------------------
 // Модели.
-// Сейчас GET /api/v1/models отдаёт catalog.ModelInfo:
-//   { name, backend, version, state, ready, usable, inputs, outputs }
-// В ближайшем будущем формат расширится до отдельной сущности со своими
-// полями отображения и параметрами нарезки:
-//   { id, title, model_name, description, seconds_per_chunk }
-// Хелперы ниже понимают оба варианта, чтобы фронтенд не пришлось трогать,
-// когда бэкенд переключится на новый формат.
+// GetModels отдаёт inference.v1.api.Model:
+//   { name, projectTitle, projectDescription, secondsPerChunk,
+//     targetClassesNum, categoryClassesNum, ready, state }
+// name — идентификатор для CreateTask, projectTitle — для отображения,
+// secondsPerChunk — длина чанка, по ней строятся и ряды чанков, и столбцы
+// гистограммы.
 // -----------------------------------------------------------------------
 export const DEFAULT_CHUNK_SECONDS = 2; // pkg.DefaultSecondsPerAudioChunk на бэкенде
 
 export function modelId(m) {
-  if (!m) return '';
-  if (typeof m === 'string') return m;
-  return m.model_name || m.name || '';
+  return (m && m.name) || '';
 }
 
 export function modelLabel(m) {
   if (!m) return '';
-  if (typeof m === 'string') return m;
-  return m.title || m.name || m.model_name || '';
+  return m.projectTitle || m.name || '';
 }
 
 export function modelChunkSeconds(m) {
-  if (m && typeof m === 'object' && Number(m.seconds_per_chunk) > 0) {
-    return Number(m.seconds_per_chunk);
-  }
+  if (m && Number(m.secondsPerChunk) > 0) return Number(m.secondsPerChunk);
   return DEFAULT_CHUNK_SECONDS;
 }
 
 export async function getModels() {
-  const res = await authorizedFetch(`${API_PREFIX}/api/v1/models`);
-
-  if (!res.ok) {
-    console.warn('getModels failed:', res.status);
+  try {
+    const res = await authorized(() => client.getModels({}));
+    // Хранилище моделей на бэкенде — map, порядок в ответе случайный.
+    // Сортируем, чтобы стрелки переключали модели в стабильном порядке.
+    return [...res.models].sort((a, b) => modelLabel(a).localeCompare(modelLabel(b)));
+  } catch (e) {
+    console.warn('getModels failed:', errorText(e, 'unknown error'));
     return [];
   }
-
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
 }
 
 export async function createTask(file, modelName, onRaw) {
-  const fd = new FormData();
-  fd.append('audio', file);
-
-  const headers = {};
-  if (modelName) {
-    headers['X-Model'] = modelName;
+  if (file.size > MAX_AUDIO_BYTES) {
+    throw new Error(`file is too large (max ${MAX_AUDIO_BYTES / 1024 / 1024} MB)`);
   }
 
-  const res = await authorizedFetch(`${API_PREFIX}/api/v1/tasks`, {
-    method: 'POST',
-    headers,
-    body: fd,
-  });
+  const audioFile = new Uint8Array(await file.arrayBuffer());
+  const method = 'InferenceService/CreateTask';
 
-  const bodyText = await res.text();
-  const body = safeParse(bodyText);
-  if (onRaw) onRaw({ url: `POST ${API_PREFIX}/api/v1/tasks`, status: res.status, body });
-
-  if (!res.ok) {
-    throw new Error(extractErrorMessage(body, 'createTask failed: ' + res.status));
+  try {
+    const res = await authorized(() =>
+      client.createTask({ audioFile, filename: file.name, modelName })
+    );
+    if (onRaw) onRaw({ url: method, status: 'OK', body: toJson(CreateTaskResponseSchema, res) });
+    return res.task; // { taskId, status, model }
+  } catch (e) {
+    if (onRaw) onRaw(errorLog(method, e));
+    throw new Error(errorText(e, 'createTask failed'));
   }
-
-  return body; // { task_id, waves, model }
 }
+
+// Временные ошибки, при которых имеет смысл продолжать опрос.
+const TRANSIENT_CODES = new Set([
+  Code.Internal,
+  Code.Unavailable,
+  Code.Unknown,
+  Code.DeadlineExceeded,
+]);
 
 export async function pollTask(taskId, onRaw) {
   const started = Date.now();
   let delay = 500;
   let lastErrorText = '';
+  const method = 'InferenceService/GetTask';
 
   while (true) {
-    const res = await authorizedFetch(`${API_PREFIX}/api/v1/tasks/${taskId}`);
+    try {
+      const res = await authorized(() => client.getTask({ taskId }));
+      if (onRaw) onRaw({ url: method, status: 'OK', body: toJson(GetTaskResponseSchema, res) });
 
-    const bodyText = await res.text();
-    const body = safeParse(bodyText);
-    if (onRaw) onRaw({ url: `GET ${API_PREFIX}/api/v1/tasks/${taskId}`, status: res.status, body });
-
-    if (res.ok) {
-      if (body.status === 'success') return body;
-      if (body.status === 'failure') {
-        throw new Error(extractErrorMessage(body?.result, 'task failed'));
+      const task = res.task;
+      if (task?.status === TaskStatus.STATUS_SUCCESS) return task;
+      if (task?.status === TaskStatus.STATUS_FAILURE) {
+        const failed = task.result?.chunks?.find((ch) => ch.errorMessage);
+        throw new Error(failed?.errorMessage || 'task failed');
       }
-      // status === 'pending' / 'processing' — просто ждём дальше
-    } else if (res.status === 500) {
-      // Известный краевой случай: result ещё NULL, пока задача pending.
-      // НЕ падаем — продолжаем опрашивать, запоминаем текст ошибки на случай таймаута.
-      lastErrorText = extractErrorMessage(body, 'pollTask failed: ' + res.status);
-    } else {
-      // 400 / 401 / 404 — реальная ошибка, опрашивать бессмысленно
-      throw new Error(extractErrorMessage(body, 'pollTask failed: ' + res.status));
+      // STATUS_PENDING / STATUS_PROCESSING — просто ждём дальше
+    } catch (e) {
+      if (!(e instanceof ConnectError)) throw e;
+      if (onRaw) onRaw(errorLog(method, e));
+      if (!TRANSIENT_CODES.has(e.code)) {
+        // InvalidArgument / NotFound / Unauthenticated — опрашивать бессмысленно
+        throw new Error(errorText(e, 'pollTask failed'));
+      }
+      lastErrorText = errorText(e, 'pollTask failed');
     }
 
     if (Date.now() - started > 90000) {
@@ -164,26 +188,5 @@ export async function pollTask(taskId, onRaw) {
 
     await new Promise((r) => setTimeout(r, delay));
     delay = Math.min(delay + 500, 5000);
-  }
-}
-
-export async function getHistory() {
-  const res = await authorizedFetch(`${API_PREFIX}/api/v1/tasks/history`);
-  if (!res.ok) {
-    const body = safeParse(await res.text().catch(() => ''));
-    throw new Error(extractErrorMessage(body, 'getHistory failed: ' + res.status));
-  }
-  const data = await res.json();
-  // Бэкенд отдаёт []*chunks.FileInferenceResult — [{ filename, chunks }, ...]
-  return Array.isArray(data) ? data : [];
-}
-
-export async function clearHistory() {
-  const res = await authorizedFetch(`${API_PREFIX}/api/v1/tasks/history`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) {
-    const body = safeParse(await res.text().catch(() => ''));
-    throw new Error(extractErrorMessage(body, 'clearHistory failed: ' + res.status));
   }
 }

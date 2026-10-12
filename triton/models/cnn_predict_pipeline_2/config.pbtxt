@@ -1,4 +1,4 @@
-name: "cnn_predict_pipline"
+name: "cnn_predict_pipeline_2"
 backend: "python"
 max_batch_size: 8
 

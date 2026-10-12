@@ -2,46 +2,70 @@ package predictor
 
 import (
 	"audio-inference-service/gen"
-	"audio-inference-service/internal/chunks"
 	"audio-inference-service/internal/domain"
 	"audio-inference-service/internal/modules"
+	"audio-inference-service/internal/modules/audio"
 	"audio-inference-service/internal/modules/triton"
 	"audio-inference-service/pkg"
 	"context"
 	"encoding/binary"
 	"fmt"
-	"golang.org/x/sync/errgroup"
+	"log/slog"
 	"math"
+	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type Predictor struct {
+	tritonConnector *triton.TritonClient
+	taskManager     modules.TaskManager
+	logger          *slog.Logger
+}
+
+type Options struct {
 	TritonConnector *triton.TritonClient
 	TaskManager     modules.TaskManager
+	Logger          *slog.Logger
+}
+
+func New(opts *Options) *Predictor {
+	if opts == nil {
+		panic("predictor opts cannot be nil")
+	}
+	return &Predictor{
+		tritonConnector: opts.TritonConnector,
+		taskManager:     opts.TaskManager,
+		logger:          opts.Logger,
+	}
 }
 
 func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) error {
+	taskID := job.TaskID
+
 	modelName := job.Payload.ModelName
 	if modelName == "" {
-		modelName = pkg.DefaultModelName
+		return fmt.Errorf("model name is required")
 	}
 
-	// База данных свободна, пока мы делаем долгий сетевой запрос к Тритону
-	result, inferErr := processAudioChunks(ctx, p.TritonConnector, modelName, job.Payload.Chunks)
+	// сам inference + замер времени всего инференса + вывод в лог этой инфы
+	start := time.Now()
+	result, inferErr := processAudioChunks(ctx, p.tritonConnector, modelName, job.Payload.Chunks)
+	end := time.Since(start)
 
-	// Обновляем статус в БД короткими транзакциями
-	err := pkg.RetryDo(ctx, nil, func(ctx context.Context) error {
-		if inferErr != nil {
-			return p.TaskManager.StatusFailure(ctx, job.TaskID, result)
-		}
-		return p.TaskManager.StatusSuccess(ctx, job.TaskID, result)
-	}, pkg.IsRetryableError)
+	logResult(p.logger, result, taskID.String(), end.String(), inferErr)
 
-	if err != nil {
-		return fmt.Errorf("update task status: %w", err)
-	}
-
+	// Обновляем статус в БД
 	if inferErr != nil {
+		if err := p.taskManager.StatusFailure(ctx, job.TaskID, result); err != nil {
+			// TODO: плохо сделано, если была ошибка в инференсе и ошибка в бд, то выграет ошибка бд, хотя на нее тут в принципе похуй в отлчии от ошибки инференса
+			return fmt.Errorf("set failure status: %w", err)
+		}
 		return fmt.Errorf("audio processing failed: %w", inferErr)
+	}
+
+	if err := p.taskManager.StatusSuccess(ctx, job.TaskID, result); err != nil {
+		return fmt.Errorf("set success status: %w", err)
 	}
 
 	return nil
@@ -51,15 +75,17 @@ func processAudioChunks(
 	ctx context.Context,
 	client *triton.TritonClient,
 	modelName string,
-	audio chunks.AudioChunks) (*chunks.FileInferenceResult, error) {
+	audio audio.AudioChunks) (*domain.FileInferenceResult, error) {
 
+	// сколько всего чанков у нас из слоев
 	total := 0
 	for _, layer := range audio.Layers {
 		total += len(layer.Chunks)
 	}
 
-	results := make([]chunks.ChunkResult, total)
+	results := make([]domain.ChunkResult, total)
 	g, ctx := errgroup.WithContext(ctx)
+	// ограничиваем количество параллельных запросов
 	sem := make(chan struct{}, pkg.MaxTritonConcurrency)
 
 	next := 0
@@ -80,7 +106,7 @@ func processAudioChunks(
 		return nil, fmt.Errorf("unexpected error during chunk processing: %w", err)
 	}
 
-	return &chunks.FileInferenceResult{
+	return &domain.FileInferenceResult{
 		Filename: audio.Filename,
 		Chunks:   results,
 	}, nil
@@ -88,10 +114,13 @@ func processAudioChunks(
 }
 
 // processChunk отправляет один чанк в Triton
-func processChunk(ctx context.Context, client *triton.TritonClient, modelName string, offset, layer, index int, chunk []byte) chunks.ChunkResult {
+func processChunk(
+	ctx context.Context, client *triton.TritonClient,
+	modelName string, offset, layer, index int, chunk []byte) domain.ChunkResult {
+
 	result, err := runRawAudioInference(ctx, client, modelName, chunk)
 	if err != nil {
-		return chunks.ChunkResult{
+		return domain.ChunkResult{
 			ChunkIndex:   index,
 			Layer:        layer,
 			Offset:       offset,
@@ -100,7 +129,7 @@ func processChunk(ctx context.Context, client *triton.TritonClient, modelName st
 		}
 	}
 
-	return chunks.ChunkResult{
+	return domain.ChunkResult{
 		ChunkIndex: index,
 		Layer:      layer,
 		Offset:     offset,
@@ -114,7 +143,7 @@ func runRawAudioInference(
 	ctx context.Context,
 	client *triton.TritonClient,
 	modelName string,
-	chunk []byte) (*chunks.InferenceResult, error) {
+	chunk []byte) (*domain.InferenceResult, error) {
 
 	req := &gen.ModelInferRequest{
 		ModelName: modelName,
@@ -140,8 +169,8 @@ func runRawAudioInference(
 	return parseResponse(resp)
 }
 
-func parseResponse(resp *gen.ModelInferResponse) (*chunks.InferenceResult, error) {
-	result := &chunks.InferenceResult{}
+func parseResponse(resp *gen.ModelInferResponse) (*domain.InferenceResult, error) {
+	result := &domain.InferenceResult{}
 
 	for i, out := range resp.Outputs {
 
@@ -183,4 +212,11 @@ func bytesToFloat32(raw []byte) []float32 {
 	}
 
 	return result
+}
+
+func logResult(logger *slog.Logger, chunks *domain.FileInferenceResult, taskID, inferenceTime string, inferenceErr error) {
+	if inferenceErr != nil {
+		logger.Error("inference error", "task_id", taskID, "error", inferenceErr.Error())
+	}
+	logger.Info("inference success", "task_id", taskID, "chunk len", len(chunks.Chunks), "inference time", inferenceTime, "filename", chunks.Filename)
 }

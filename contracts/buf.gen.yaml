@@ -1,0 +1,14 @@
+version: v2
+inputs:
+  - directory: .
+    paths:
+      - inference/v1
+plugins:
+  - local: protoc-gen-go
+    out: ../backend/gen
+    opt:
+      - paths=source_relative
+  - local: protoc-gen-connect-go
+    out: ../backend/gen
+    opt:
+      - paths=source_relative

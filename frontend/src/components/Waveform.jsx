@@ -1,19 +1,16 @@
 // src/components/Waveform.jsx
 //
-// Раньше компонент назывался Spectrogram, хотя настоящей спектрограммой
-// (частота × время) не является: бэкенд отдаёт всего один плоский массив
-// RMS-амплитуды по времени (pkg.AudioWaveBucketsLen = 40 "бакетов" на весь
-// файл, см. chunks.audioWaveform на бэкенде). Это обычная диаграмма
-// громкости во времени — переименовано в Waveform, чтобы не вводить в
-// заблуждение.
+// Диаграмма громкости во времени (RMS-амплитуда). Раньше массив waves
+// приходил с бэкенда в ответе CreateTask, теперь он строится на фронтенде
+// из самого файла — см. src/audio.js.
 //
-// Диаграмма рисуется по старому, простому принципу: один столбик — один
-// элемент массива waves, столбики равномерно распределены по всей ширине
-// (без привязки/пересчёта под границы чанков). Ряды чанков под диаграммой —
-// отдельная, независимая по разметке штука, как и раньше. Единственная
-// связь между ними — тонкие направляющие линии, идущие от начала каждого
-// базового чанка вверх, в область графика.
-import { useEffect, useRef } from 'react';
+// Столбцы привязаны к secondsPerChunk модели: границы столбцов совпадают
+// с границами чанков (и базового слоя, и слоя со сдвигом +1s), поэтому
+// чанк больше не заканчивается посреди столбца. Направляющие линии от
+// границ чанков вверх, в область графика, ложатся ровно в щели между
+// столбцами.
+import { useEffect, useMemo, useRef } from 'react';
+import { computeBars } from '../audio.js';
 
 const CATEGORY = { 0: 'car', 1: 'emv', 2: 'motorcycle', 3: 'tram', 4: 'truck' };
 const TARGET = {
@@ -76,7 +73,7 @@ function mergeGroups(ranges, chunksArr) {
     const { start, end } = ranges[i];
     const catIdx = argmaxIndex(ch.category);
     const tgtIdx = argmaxIndex(ch.target);
-    const isError = !!ch.error;
+    const isError = !!ch.errorMessage;
 
     const last = groups[groups.length - 1];
     const sameAsLast =
@@ -86,7 +83,7 @@ function mergeGroups(ranges, chunksArr) {
       last.end = end;
       last.count += 1;
     } else {
-      groups.push({ start, end, catIdx, tgtIdx, error: isError, count: 1 });
+      groups.push({ start, end, catIdx, tgtIdx, error: isError, errorMessage: ch.errorMessage, count: 1 });
     }
   });
   return groups;
@@ -94,13 +91,13 @@ function mergeGroups(ranges, chunksArr) {
 
 // -----------------------------------------------------------------------
 // Границы чанков по времени (нужны только для рядов чанков ниже графика).
-// Правило (согласовано с бэкендом, см. internal/chunks/audio_chunk.go):
+// Правило (согласовано с бэкендом, см. internal/modules/audio/splitter.go):
 //  - базовый слой (offset=0): чанки фиксированного размера chunkSeconds,
 //    последний чанк может быть короче (хвост длительностью duration % chunkSeconds,
 //    если этот хвост длится дольше ~0.5s — иначе бэкенд его просто отбрасывает).
 //  - слои со сдвигом (offset=1s и т.д.): те же чанки фиксированного размера,
 //    считаются от отметки offset, хвост НЕ создаётся.
-// Опираемся на chunk_index и offset, которые уже возвращает бэкенд.
+// Опираемся на chunkIndex и offset, которые уже возвращает бэкенд.
 // -----------------------------------------------------------------------
 function chunkRange(offset, chunkIndex, chunkSeconds, duration) {
   const start = offset + chunkIndex * chunkSeconds;
@@ -108,22 +105,32 @@ function chunkRange(offset, chunkIndex, chunkSeconds, duration) {
   return { start, end: Math.max(start, end) };
 }
 
-export default function Waveform({ waves, chunks, duration, currentTime, chunkSeconds }) {
+export default function Waveform({ audioData, chunks, duration: playerDuration, currentTime, chunkSeconds }) {
   const canvasRef = useRef(null);
+
+  // Длительность берём из декодированного файла — по ней же считаются
+  // столбцы, так что столбцы и чанки размечаются в одной шкале времени.
+  // Пока файл не декодирован — длительность из <audio>.
+  const duration = audioData?.duration || playerDuration;
+
+  const bars = useMemo(
+    () => (audioData ? computeBars(audioData, chunkSeconds) : []),
+    [audioData, chunkSeconds]
+  );
 
   const baseChunks = (chunks || [])
     .filter((ch) => (ch.offset || 0) === 0)
     .slice()
-    .sort((a, b) => a.chunk_index - b.chunk_index);
+    .sort((a, b) => a.chunkIndex - b.chunkIndex);
 
   const offsetChunks = (chunks || [])
     .filter((ch) => (ch.offset || 0) > 0)
     .slice()
-    .sort((a, b) => a.chunk_index - b.chunk_index);
+    .sort((a, b) => a.chunkIndex - b.chunkIndex);
   const offsetSeconds = offsetChunks.length ? (offsetChunks[0].offset || 1) : 1;
 
-  const baseRanges = baseChunks.map((ch) => chunkRange(0, ch.chunk_index, chunkSeconds, duration));
-  const offsetRanges = offsetChunks.map((ch) => chunkRange(offsetSeconds, ch.chunk_index, chunkSeconds, duration));
+  const baseRanges = baseChunks.map((ch) => chunkRange(0, ch.chunkIndex, chunkSeconds, duration));
+  const offsetRanges = offsetChunks.map((ch) => chunkRange(offsetSeconds, ch.chunkIndex, chunkSeconds, duration));
 
   // Схлопнутые блоки считаем один раз — они нужны и для отрисовки рядов,
   // и для направляющих линий (линии должны идти по границам итоговых
@@ -131,11 +138,12 @@ export default function Waveform({ waves, chunks, duration, currentTime, chunkSe
   const baseGroups = mergeGroups(baseRanges, baseChunks);
   const offsetGroups = mergeGroups(offsetRanges, offsetChunks);
 
-  // Обычная столбчатая диаграмма: один столбик — один элемент waves,
-  // столбики равномерно распределены по ширине (без привязки к чанкам).
+  // Столбчатая диаграмма: каждый столбик рисуется по своему отрезку
+  // времени [start, end), а не равномерно по индексу — так столбцы
+  // совпадают с разметкой чанков ниже.
   useEffect(() => {
     const cv = canvasRef.current;
-    if (!cv || !waves || !waves.length) return;
+    if (!cv) return;
     const ctx = cv.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const W = cv.clientWidth;
@@ -144,20 +152,21 @@ export default function Waveform({ waves, chunks, duration, currentTime, chunkSe
     cv.height = H * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
+    if (!bars.length || !duration) return;
 
-    const n = waves.length;
-    const max = Math.max(...waves, 0.001);
-    const gap = 1;
-    const barW = Math.max(1, W / n - gap);
+    const max = Math.max(...bars.map((b) => b.value), 0.001);
 
     const topPadding = 10;
     const floorY = H;
     const usableH = floorY - topPadding;
 
-    for (let i = 0; i < n; i++) {
-      const t = waves[i] / max;
+    for (const bar of bars) {
+      const t = bar.value / max;
       const h = Math.max(2, t * usableH);
-      const x = (i / n) * W;
+      const x = (bar.start / duration) * W;
+      const fullW = ((bar.end - bar.start) / duration) * W;
+      // Зазор в 1px между столбиками, пока столбики достаточно широкие
+      const barW = Math.max(1, fullW > 3 ? fullW - 1 : fullW);
       const top = floorY - h;
       const color = colormap(t);
 
@@ -167,7 +176,7 @@ export default function Waveform({ waves, chunks, duration, currentTime, chunkSe
       ctx.fillStyle = grad;
       ctx.fillRect(x, top, barW, h);
     }
-  }, [waves]);
+  }, [bars, duration]);
 
   const renderChunkRow = (groups, extraClass) => (
     <div className={`chunk-row ${extraClass}`}>
@@ -182,6 +191,7 @@ export default function Waveform({ waves, chunks, duration, currentTime, chunkSe
             key={`${extraClass}-${i}`}
             className={`chunk-box${isActive ? ' active' : ''}${g.error ? ' has-error' : ''}`}
             style={{ left: `${left}%`, width: `calc(${width}% - 1px)` }}
+            title={g.error ? g.errorMessage : undefined}
           >
             <div className="chunk-box-category">
               {CATEGORY[g.catIdx] || '?'}

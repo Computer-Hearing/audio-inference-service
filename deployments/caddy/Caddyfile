@@ -1,5 +1,5 @@
 :80 {
-    handle /api/* {
+    handle /inference.v1.api.InferenceService/* {
         reverse_proxy backend:6767
     }
 

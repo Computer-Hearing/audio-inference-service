@@ -8,3 +8,4 @@
 *.txt
 node_modules/
 frontend/dist/
+request.json

@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package inference.v1.api;
+
+option go_package = "audio-inference-service/gen/inference/v1;inferencev1";
+
+service InferenceService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc GetModels(GetModelsRequest) returns (GetModelsResponse);
+}
+
+// RegisterRequest запрашивает регистрацию. Пустой username — сгенерировать анонимный
+// RegisterResponse возвращает сгенеренное уникальное имя пользователя + куку с ней
+message RegisterRequest {
+  string username = 1;
+}
+message RegisterResponse {
+  string username = 1;
+}
+
+// CreateTaskRequest - бек принимает аудио файл открытый, в байтах; имя файла (с расширением), а также имя модели
+// по которой инференс будет идти
+// CreateTaskResponse - возвращает таску: id таски, статус pending, модель по которой инференс пойдет
+message CreateTaskRequest {
+  bytes audio_file = 1;
+  string filename = 2;
+  string model_name = 3;
+}
+message CreateTaskResponse {
+  Task task = 1;
+}
+
+// GetTaskRequest - передаем id таски, которую проверить хотим
+// GetTaskResponse - возвращаем актуальное состояние таски: ее id, статус, модель по которой инференсилось,
+// а также результат (если он есть) - ответ от тритона
+message GetTaskRequest {
+  string task_id = 1;
+}
+message GetTaskResponse {
+  Task task = 1;
+}
+
+// GetModelsRequest, GetModelsResponse
+// получение списка моделей, запрос - ничего для него не надо; ответ - актуальный список моделей
+message GetModelsRequest {}
+message GetModelsResponse {
+  repeated Model models = 1;
+}
+
+
+// Модель задачи
+message Task {
+  string task_id = 1;
+  TaskStatus status = 2;
+  string model = 3;
+  TaskResult result = 4;
+}
+
+// Модель Тритон-модели
+message Model {
+  string name = 1;
+  string projectTitle = 2;
+  string projectDescription = 3;
+  int32  secondsPerChunk = 4;
+  int32  targetClassesNum = 5;
+  int32  categoryClassesNum = 6;
+  bool   ready = 7;
+  string state = 8;
+}
+
+// Модель результата инференса
+message TaskResult {
+  string filename = 1;
+  repeated Chunk chunks = 2;
+}
+
+// Модель одного чанка
+message Chunk {
+  int32 chunk_index = 1;
+  int32 layer = 2;
+  int32 offset = 3;
+  repeated float category = 4;
+  repeated float target = 5;
+  string error_message = 6;
+}
+
+// Статусы у задачи
+enum TaskStatus {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_SUCCESS = 1;
+  STATUS_FAILURE = 2;
+  STATUS_PENDING = 3;
+  STATUS_PROCESSING = 4;
+}

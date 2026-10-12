@@ -2,14 +2,9 @@ package pkg
 
 import (
 	"crypto/rand"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"math/big"
-	"mime"
-	"net/http"
 	"time"
 )
 
@@ -31,7 +26,7 @@ const (
 	// Triton
 	CategoryOutputName    = "category_output"
 	TargetOutputName      = "target_output"
-	DefaultModelName      = "cnn_predict_pipline"
+	DefaultModelName      = "cnn_predict_pipeline_2"
 	RawAudioInputName     = "RAW_AUDIO"
 	RawAudioInputDatatype = "TYPE_UINT8"
 	MaxTritonConcurrency  = 8
@@ -83,52 +78,4 @@ func randWord() string {
 		result[i] = charset[n.Int64()]
 	}
 	return string(result)
-}
-
-func ParseJSONBody(r *http.Request, data any) error {
-	defer r.Body.Close()
-
-	if ct := r.Header.Get("Content-Type"); ct != "" {
-		mediaType, _, err := mime.ParseMediaType(ct)
-		if err != nil || mediaType != "application/json" {
-			return APIError{
-				StatusCode: http.StatusUnsupportedMediaType,
-				Message:    "UNSUPPORTED_MEDIA_TYPE",
-			}
-		}
-	}
-
-	const maxBodyBytes = 1024 * 1024
-	r.Body = http.MaxBytesReader(nil, r.Body, maxBodyBytes)
-
-	dec := json.NewDecoder(r.Body)
-
-	if err := dec.Decode(data); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			return APIError{
-				StatusCode: http.StatusRequestEntityTooLarge,
-				Message:    "REQUEST_ENTITY_TOO_LARGE",
-			}
-		}
-		return APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "INVALID_BODY",
-		}
-	}
-
-	if err := dec.Decode(&struct{}{}); err != nil && err != io.EOF {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			return APIError{
-				StatusCode: http.StatusRequestEntityTooLarge,
-				Message:    "REQUEST_ENTITY_TOO_LARGE",
-			}
-		}
-		return APIError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "INVALID_BODY",
-		}
-	}
-	return nil
 }

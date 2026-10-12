@@ -7,9 +7,10 @@ import {
   modelId,
   modelLabel,
   modelChunkSeconds,
+  MAX_AUDIO_BYTES,
 } from '../api.js';
+import { decodeAudio } from '../audio.js';
 import Waveform from './Waveform.jsx';
-import History from './History.jsx';
 import Player from './Player.jsx';
 
 function truncateName(name, max = 40) {
@@ -66,10 +67,12 @@ export default function Main() {
 
   const [state, setState] = useState('idle');
   const [error, setError] = useState(null);
-  const [waves, setWaves] = useState(null);
   const [chunks, setChunks] = useState(null);
+  // Декодированный файл ({ samples, sampleRate, duration }) — из него
+  // строится гистограмма громкости (раньше её присылал бэкенд как waves).
+  const [audioData, setAudioData] = useState(null);
   // Модель, с которой реально был проанализирован текущий файл — от неё
-  // зависит нарезка чанков по времени (seconds_per_chunk). Пользователь
+  // зависит нарезка чанков и столбцов по времени (secondsPerChunk). Пользователь
   // может переключить модель для *следующего* анализа, не ломая
   // отображение уже готового результата.
   const [analyzedModel, setAnalyzedModel] = useState(null);
@@ -79,21 +82,22 @@ export default function Main() {
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
 
-  const [historyOn, setHistoryOn] = useState(false);
-
   const [rawLog, setRawLog] = useState([]);
 
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
   const rafRef = useRef(null);
+  // Номер текущего файла — чтобы результат декодирования предыдущего
+  // файла (если пользователь быстро выбрал другой) не перезаписал новый.
+  const decodeIdRef = useRef(0);
 
   const handleRaw = (info) => setRawLog((prev) => [...prev, info]);
 
   useEffect(() => {
-    // Список моделей — строго с бэкенда (GET /api/v1/models), никаких
-    // заглушек: если список пуст, значит модели ещё не заведены в БД
-    // (см. domain.Model / UpsertModel на бэкенде) — это состояние явно
-    // показывается пользователю, а не подменяется фейковыми названиями.
+    // Список моделей — строго с бэкенда (GetModels), никаких заглушек:
+    // если список пуст, значит Triton ещё не отдал ни одной модели
+    // (см. models.Syncer на бэкенде) — это состояние явно показывается
+    // пользователю, а не подменяется фейковыми названиями.
     getModels()
       .then((list) => {
         setModels(list || []);
@@ -126,6 +130,7 @@ export default function Main() {
   const currentModel = models[modelIndex] || null;
   const currentModelId = modelId(currentModel);
   const currentModelLabel = modelLabel(currentModel) || 'no models available';
+  const currentModelReady = !currentModel || currentModel.ready !== false;
 
   const goToModel = (delta) => {
     if (!models.length) return;
@@ -137,32 +142,43 @@ export default function Main() {
     setFile(f);
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(URL.createObjectURL(f));
-    setWaves(null);
+    setAudioData(null);
     setChunks(null);
     setAnalyzedModel(null);
+    setError(null);
     setState('idle');
     setCurrentTime(0);
+
+    // Декодируем сразу, пока пользователь выбирает модель — к моменту
+    // анализа гистограмма обычно уже готова. Если браузер не умеет этот
+    // формат, гистограммы просто не будет, анализ это не ломает.
+    const decodeId = ++decodeIdRef.current;
+    decodeAudio(f)
+      .then((data) => {
+        if (decodeIdRef.current === decodeId) setAudioData(data);
+      })
+      .catch((e) => console.warn('decodeAudio failed:', e));
   };
 
   const handleAnalyze = async () => {
     if (!file) return;
     setError(null);
     setRawLog([]);
+    setChunks(null);
     setState('analyzing');
     const modelUsed = currentModel;
     try {
       const created = await createTask(file, currentModelId, handleRaw);
-      setWaves(created.waves || []);
       setAnalyzedModel(modelUsed);
 
-      const result = await pollTask(created.task_id, handleRaw);
-      setChunks(result.result?.chunks || []);
+      const task = await pollTask(created.taskId, handleRaw);
+      setChunks(task.result?.chunks || []);
       setState('done');
     } catch (e) {
       setState('error');
       setError(
         e.message === 'timeout'
-          ? 'Request timed out. Result may appear in history later.'
+          ? 'Request timed out. Please try again later.'
           : 'Error: ' + e.message
       );
     }
@@ -205,7 +221,8 @@ export default function Main() {
     setFile(null);
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
-    setWaves(null);
+    decodeIdRef.current += 1;
+    setAudioData(null);
     setChunks(null);
     setAnalyzedModel(null);
     setState('idle');
@@ -227,18 +244,14 @@ export default function Main() {
         {/* Шапка */}
         <header className="header">
           <h1>audio inference</h1>
-          <div className="row">
-            <button onClick={() => setHistoryOn((v) => !v)}>history</button>
-          </div>
         </header>
 
         {/* Название текущей модели — компактно, слева под шапкой */}
-        <div className="model-indicator">
+        <div className="model-indicator" title={currentModel?.projectDescription || currentModelId}>
           model: <span className="model-indicator-value">{currentModelLabel}</span>
+          {currentModel && <> · {modelChunkSeconds(currentModel)}s chunks</>}
+          {!currentModelReady && <> · not ready</>}
         </div>
-
-        {/* История (если включена) */}
-        {historyOn && <History open={historyOn} />}
 
         {/* Основная область – центрирование блока загрузки */}
         <div className="main-area">
@@ -283,6 +296,9 @@ export default function Main() {
               <p className="muted upload-hint">
                 {file ? truncateName(file.name) : 'click or drop an audio file'}
               </p>
+              {!file && (
+                <p className="muted upload-limit">up to {MAX_AUDIO_BYTES / 1024 / 1024} MB</p>
+              )}
             </div>
             <input
               type="file"
@@ -292,10 +308,10 @@ export default function Main() {
             />
 
             <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
-              <button onClick={handleAnalyze} disabled={!file || !currentModelId || state === 'analyzing'}>
+              <button onClick={handleAnalyze} disabled={!file || !currentModelId || !currentModelReady || state === 'analyzing'}>
                 {state === 'analyzing' ? 'analyzing...' : 'analyze'}
               </button>
-              {(file || waves) && <button onClick={handleReset}>reset</button>}
+              {file && <button onClick={handleReset}>reset</button>}
             </div>
 
             {state === 'error' && <p className="error">{error}</p>}
@@ -316,9 +332,9 @@ export default function Main() {
         </div>
 
         {/* Диаграмма анализа – идёт ниже, но уже не центрируется */}
-        {waves && (
+        {analyzedModel && (
           <Waveform
-            waves={waves}
+            audioData={audioData}
             chunks={chunks}
             duration={duration}
             currentTime={currentTime}
@@ -343,7 +359,7 @@ export default function Main() {
               }}
             >
               {rawLog.map((entry, i) => (
-                `[${i}] ${entry.url} → HTTP ${entry.status}\n` +
+                `[${i}] ${entry.url} → ${entry.status}\n` +
                 JSON.stringify(entry.body, null, 2) +
                 '\n\n'
               ))}

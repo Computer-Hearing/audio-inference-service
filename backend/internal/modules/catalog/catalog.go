@@ -1,3 +1,4 @@
+// Package catalog - каталог моделей Triton
 package catalog
 
 import (
@@ -42,7 +43,7 @@ type TritonCatalog struct {
 	cachedAt time.Time
 }
 
-func NewTritonCatalog(client *triton.TritonClient, ttl time.Duration) *TritonCatalog {
+func New(client *triton.TritonClient, ttl time.Duration) *TritonCatalog {
 	if ttl <= 0 {
 		ttl = defaultCacheTTL
 	}
@@ -94,17 +95,7 @@ func (c *TritonCatalog) IsAvailable(ctx context.Context, modelName string) (bool
 	return false, nil
 }
 
-// matchesContract проверяет, что модель принимает входной аудио-тензор
-func matchesContract(m ModelInfo) bool {
-	for _, in := range m.Inputs {
-		if in.Name == pkg.RawAudioInputName && in.Datatype == pkg.RawAudioInputDatatype {
-			return true
-		}
-	}
-	return false
-}
-
-// filterUsable оставляет только модели подходящие под аудио-контракт
+// filterUsable оставляет только модели подходящие под аудио-контракт нашего бекенда
 func filterUsable(models []ModelInfo) []ModelInfo {
 	usable := make([]ModelInfo, 0, len(models))
 	for _, m := range models {
@@ -115,6 +106,16 @@ func filterUsable(models []ModelInfo) []ModelInfo {
 	}
 
 	return usable
+}
+
+// matchesContract проверяет, что модель принимает входной аудио-тензор
+func matchesContract(m ModelInfo) bool {
+	for _, in := range m.Inputs {
+		if in.Name == pkg.RawAudioInputName && in.Datatype == pkg.RawAudioInputDatatype {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *TritonCatalog) fetch(ctx context.Context) ([]ModelInfo, error) {
