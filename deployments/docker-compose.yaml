@@ -48,12 +48,10 @@ services:
     networks:
       - inference-net
       - computer-hearing
-    container_name: inference_caddy
+    container_name: ${CADDY_CONTAINER_NAME:-inference_caddy}
     build:
       context: ..
       dockerfile: deployments/dockerfiles/Caddy.Dockerfile
-    labels:
-      - "traefik.http.routers.http-0-nzwg9n3wtub0swxhabwur7bh-caddy-aeaf.middlewares=gzip-sse"
     expose:
       - "80"
     #volumes:
