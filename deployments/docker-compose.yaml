@@ -52,6 +52,8 @@ services:
     build:
       context: ..
       dockerfile: deployments/dockerfiles/Caddy.Dockerfile
+    labels:
+      - "traefik.http.routers.http-0-nzwg9n3wtub0swxhabwur7bh-caddy-aeaf.middlewares=gzip-sse"
     expose:
       - "80"
     #volumes:
