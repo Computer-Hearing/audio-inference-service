@@ -3,7 +3,7 @@ version: '3.8'
 networks:
   inference-net:
     driver: bridge
-  tool-net:
+  computer-hearing:
     external: true
 
 services:
@@ -37,7 +37,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       HTTP_ADDR: ${HTTP_ADDR:-:6767}
       DB_PATH: ${DB_PATH:-sqlite.db}
-      TRITON_ADDR: ${TRITON_ADDR:-triton:8001}
+      TRITON_ADDR: ${TRITON_ADDR:-inference_triton:8001}
     volumes:
       - backend_data:/app
     restart: always
@@ -47,7 +47,7 @@ services:
   caddy:
     networks:
       - inference-net
-      - tool-net
+      - computer-hearing
     container_name: inference_caddy
     build:
       context: ..
