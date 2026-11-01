@@ -46,9 +46,11 @@ services:
 
   caddy:
     networks:
-      - inference-net
-      - computer-hearing
-    container_name: ${CADDY_CONTAINER_NAME:-inference_caddy}
+      inference-net:
+      computer-hearing:
+        aliases:
+          - inference_caddy
+    container_name: inference_caddy
     build:
       context: ..
       dockerfile: deployments/dockerfiles/Caddy.Dockerfile
