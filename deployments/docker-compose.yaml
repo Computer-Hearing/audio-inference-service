@@ -50,8 +50,8 @@ services:
       - computer-hearing
     container_name: inference_caddy
     build:
-      context: ..
-      dockerfile: deployments/dockerfiles/Caddy.Dockerfile
+      context: .
+      dockerfile: dockerfiles/Caddy.Dockerfile
     ports:
       - 80:80
     volumes:
