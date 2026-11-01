@@ -34,7 +34,7 @@ services:
       - "6767"
     environment:
       ENV: ${ENV:-development}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
       HTTP_ADDR: ${HTTP_ADDR:-:6767}
       DB_PATH: ${DB_PATH:-sqlite.db}
       TRITON_ADDR: ${TRITON_ADDR:-triton:8001}
