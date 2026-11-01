@@ -20,7 +20,7 @@ services:
       - "8002" # Metrics endpoints for Prometheus
     restart: always
     volumes:
-      - ../triton/models:/models
+      - triton/models:/models
     command: ["tritonserver", "--model-store=/models"]
 
   backend:
