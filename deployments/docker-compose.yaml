@@ -50,12 +50,12 @@ services:
       - computer-hearing
     container_name: inference_caddy
     build:
-      context: .
-      dockerfile: dockerfiles/Caddy.Dockerfile
+      context: ..
+      dockerfile: deployments/dockerfiles/Caddy.Dockerfile
     ports:
       - 80:80
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    #volumes:
+    #  - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
     restart: always
     depends_on:
       - backend
