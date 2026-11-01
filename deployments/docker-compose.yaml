@@ -12,8 +12,8 @@ services:
       - inference-net
     container_name: inference_triton
     build:
-      context: .
-      dockerfile: dockerfiles/Triton.Dockerfile
+      context: ..
+      dockerfile: deployments/dockerfiles/Triton.Dockerfile
     expose:
       - "8000" # HTTP endpoints for inference
       - "8001" # GRPS endpoints for inference
