@@ -30,8 +30,8 @@ services:
     build:
       context: ../backend
       dockerfile: ../deployments/dockerfiles/Backend.Dockerfile
-    ports:
-      - 6767:6767
+    expose:
+      - "6767"
     environment:
       ENV: ${ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -52,8 +52,8 @@ services:
     build:
       context: ..
       dockerfile: deployments/dockerfiles/Caddy.Dockerfile
-    ports:
-      - 80:80
+    expose:
+      - "80"
     #volumes:
     #  - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
     restart: always
