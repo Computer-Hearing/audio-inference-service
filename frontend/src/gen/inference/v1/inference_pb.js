@@ -8,91 +8,77 @@ import { enumDesc, fileDesc, messageDesc, serviceDesc, tsEnum } from "@bufbuild/
  * Describes the file inference/v1/inference.proto.
  */
 export const file_inference_v1_inference = /*@__PURE__*/
-  fileDesc("ChxpbmZlcmVuY2UvdjEvaW5mZXJlbmNlLnByb3RvEhBpbmZlcmVuY2UudjEuYXBpIiMKD1JlZ2lzdGVyUmVxdWVzdBIQCgh1c2VybmFtZRgBIAEoCSIkChBSZWdpc3RlclJlc3BvbnNlEhAKCHVzZXJuYW1lGAEgASgJIk0KEUNyZWF0ZVRhc2tSZXF1ZXN0EhIKCmF1ZGlvX2ZpbGUYASABKAwSEAoIZmlsZW5hbWUYAiABKAkSEgoKbW9kZWxfbmFtZRgDIAEoCSI6ChJDcmVhdGVUYXNrUmVzcG9uc2USJAoEdGFzaxgBIAEoCzIWLmluZmVyZW5jZS52MS5hcGkuVGFzayIhCg5HZXRUYXNrUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJIjcKD0dldFRhc2tSZXNwb25zZRIkCgR0YXNrGAEgASgLMhYuaW5mZXJlbmNlLnYxLmFwaS5UYXNrIhIKEEdldE1vZGVsc1JlcXVlc3QiPAoRR2V0TW9kZWxzUmVzcG9uc2USJwoGbW9kZWxzGAEgAygLMhcuaW5mZXJlbmNlLnYxLmFwaS5Nb2RlbCKCAQoEVGFzaxIPCgd0YXNrX2lkGAEgASgJEiwKBnN0YXR1cxgCIAEoDjIcLmluZmVyZW5jZS52MS5hcGkuVGFza1N0YXR1cxINCgVtb2RlbBgDIAEoCRIsCgZyZXN1bHQYBCABKAsyHC5pbmZlcmVuY2UudjEuYXBpLlRhc2tSZXN1bHQitAEKBU1vZGVsEgwKBG5hbWUYASABKAkSFAoMcHJvamVjdFRpdGxlGAIgASgJEhoKEnByb2plY3REZXNjcmlwdGlvbhgDIAEoCRIXCg9zZWNvbmRzUGVyQ2h1bmsYBCABKAUSGAoQdGFyZ2V0Q2xhc3Nlc051bRgFIAEoBRIaChJjYXRlZ29yeUNsYXNzZXNOdW0YBiABKAUSDQoFcmVhZHkYByABKAgSDQoFc3RhdGUYCCABKAkiRwoKVGFza1Jlc3VsdBIQCghmaWxlbmFtZRgBIAEoCRInCgZjaHVua3MYAiADKAsyFy5pbmZlcmVuY2UudjEuYXBpLkNodW5rInQKBUNodW5rEhMKC2NodW5rX2luZGV4GAEgASgFEg0KBWxheWVyGAIgASgFEg4KBm9mZnNldBgDIAEoBRIQCghjYXRlZ29yeRgEIAMoAhIOCgZ0YXJnZXQYBSADKAISFQoNZXJyb3JfbWVzc2FnZRgGIAEoCSp3CgpUYXNrU3RhdHVzEhYKElNUQVRVU19VTlNQRUNJRklFRBAAEhIKDlNUQVRVU19TVUNDRVNTEAESEgoOU1RBVFVTX0ZBSUxVUkUQAhISCg5TVEFUVVNfUEVORElORxADEhUKEVNUQVRVU19QUk9DRVNTSU5HEAQy5AIKEEluZmVyZW5jZVNlcnZpY2USUQoIUmVnaXN0ZXISIS5pbmZlcmVuY2UudjEuYXBpLlJlZ2lzdGVyUmVxdWVzdBoiLmluZmVyZW5jZS52MS5hcGkuUmVnaXN0ZXJSZXNwb25zZRJXCgpDcmVhdGVUYXNrEiMuaW5mZXJlbmNlLnYxLmFwaS5DcmVhdGVUYXNrUmVxdWVzdBokLmluZmVyZW5jZS52MS5hcGkuQ3JlYXRlVGFza1Jlc3BvbnNlEk4KB0dldFRhc2sSIC5pbmZlcmVuY2UudjEuYXBpLkdldFRhc2tSZXF1ZXN0GiEuaW5mZXJlbmNlLnYxLmFwaS5HZXRUYXNrUmVzcG9uc2USVAoJR2V0TW9kZWxzEiIuaW5mZXJlbmNlLnYxLmFwaS5HZXRNb2RlbHNSZXF1ZXN0GiMuaW5mZXJlbmNlLnYxLmFwaS5HZXRNb2RlbHNSZXNwb25zZUI2WjRhdWRpby1pbmZlcmVuY2Utc2VydmljZS9nZW4vaW5mZXJlbmNlL3YxO2luZmVyZW5jZXYxYgZwcm90bzM");
-
-/**
- * Describes the message inference.v1.api.RegisterRequest.
- * Use `create(RegisterRequestSchema)` to create a new message.
- */
-export const RegisterRequestSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 0);
-
-/**
- * Describes the message inference.v1.api.RegisterResponse.
- * Use `create(RegisterResponseSchema)` to create a new message.
- */
-export const RegisterResponseSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 1);
+  fileDesc("ChxpbmZlcmVuY2UvdjEvaW5mZXJlbmNlLnByb3RvEhBpbmZlcmVuY2UudjEuYXBpIk0KEUNyZWF0ZVRhc2tSZXF1ZXN0EhIKCmF1ZGlvX2ZpbGUYASABKAwSEAoIZmlsZW5hbWUYAiABKAkSEgoKbW9kZWxfbmFtZRgDIAEoCSI6ChJDcmVhdGVUYXNrUmVzcG9uc2USJAoEdGFzaxgBIAEoCzIWLmluZmVyZW5jZS52MS5hcGkuVGFzayIhCg5HZXRUYXNrUmVxdWVzdBIPCgd0YXNrX2lkGAEgASgJIjcKD0dldFRhc2tSZXNwb25zZRIkCgR0YXNrGAEgASgLMhYuaW5mZXJlbmNlLnYxLmFwaS5UYXNrIhIKEEdldE1vZGVsc1JlcXVlc3QiPAoRR2V0TW9kZWxzUmVzcG9uc2USJwoGbW9kZWxzGAEgAygLMhcuaW5mZXJlbmNlLnYxLmFwaS5Nb2RlbCKCAQoEVGFzaxIPCgd0YXNrX2lkGAEgASgJEiwKBnN0YXR1cxgCIAEoDjIcLmluZmVyZW5jZS52MS5hcGkuVGFza1N0YXR1cxINCgVtb2RlbBgDIAEoCRIsCgZyZXN1bHQYBCABKAsyHC5pbmZlcmVuY2UudjEuYXBpLlRhc2tSZXN1bHQitAEKBU1vZGVsEgwKBG5hbWUYASABKAkSFAoMcHJvamVjdFRpdGxlGAIgASgJEhoKEnByb2plY3REZXNjcmlwdGlvbhgDIAEoCRIXCg9zZWNvbmRzUGVyQ2h1bmsYBCABKAUSGAoQdGFyZ2V0Q2xhc3Nlc051bRgFIAEoBRIaChJjYXRlZ29yeUNsYXNzZXNOdW0YBiABKAUSDQoFcmVhZHkYByABKAgSDQoFc3RhdGUYCCABKAkiRwoKVGFza1Jlc3VsdBIQCghmaWxlbmFtZRgBIAEoCRInCgZjaHVua3MYAiADKAsyFy5pbmZlcmVuY2UudjEuYXBpLkNodW5rInQKBUNodW5rEhMKC2NodW5rX2luZGV4GAEgASgFEg0KBWxheWVyGAIgASgFEg4KBm9mZnNldBgDIAEoBRIQCghjYXRlZ29yeRgEIAMoAhIOCgZ0YXJnZXQYBSADKAISFQoNZXJyb3JfbWVzc2FnZRgGIAEoCSp3CgpUYXNrU3RhdHVzEhYKElNUQVRVU19VTlNQRUNJRklFRBAAEhIKDlNUQVRVU19TVUNDRVNTEAESEgoOU1RBVFVTX0ZBSUxVUkUQAhISCg5TVEFUVVNfUEVORElORxADEhUKEVNUQVRVU19QUk9DRVNTSU5HEAQykQIKEEluZmVyZW5jZVNlcnZpY2USVwoKQ3JlYXRlVGFzaxIjLmluZmVyZW5jZS52MS5hcGkuQ3JlYXRlVGFza1JlcXVlc3QaJC5pbmZlcmVuY2UudjEuYXBpLkNyZWF0ZVRhc2tSZXNwb25zZRJOCgdHZXRUYXNrEiAuaW5mZXJlbmNlLnYxLmFwaS5HZXRUYXNrUmVxdWVzdBohLmluZmVyZW5jZS52MS5hcGkuR2V0VGFza1Jlc3BvbnNlElQKCUdldE1vZGVscxIiLmluZmVyZW5jZS52MS5hcGkuR2V0TW9kZWxzUmVxdWVzdBojLmluZmVyZW5jZS52MS5hcGkuR2V0TW9kZWxzUmVzcG9uc2VCNlo0YXVkaW8taW5mZXJlbmNlLXNlcnZpY2UvZ2VuL2luZmVyZW5jZS92MTtpbmZlcmVuY2V2MWIGcHJvdG8z");
 
 /**
  * Describes the message inference.v1.api.CreateTaskRequest.
  * Use `create(CreateTaskRequestSchema)` to create a new message.
  */
 export const CreateTaskRequestSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 2);
+  messageDesc(file_inference_v1_inference, 0);
 
 /**
  * Describes the message inference.v1.api.CreateTaskResponse.
  * Use `create(CreateTaskResponseSchema)` to create a new message.
  */
 export const CreateTaskResponseSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 3);
+  messageDesc(file_inference_v1_inference, 1);
 
 /**
  * Describes the message inference.v1.api.GetTaskRequest.
  * Use `create(GetTaskRequestSchema)` to create a new message.
  */
 export const GetTaskRequestSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 4);
+  messageDesc(file_inference_v1_inference, 2);
 
 /**
  * Describes the message inference.v1.api.GetTaskResponse.
  * Use `create(GetTaskResponseSchema)` to create a new message.
  */
 export const GetTaskResponseSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 5);
+  messageDesc(file_inference_v1_inference, 3);
 
 /**
  * Describes the message inference.v1.api.GetModelsRequest.
  * Use `create(GetModelsRequestSchema)` to create a new message.
  */
 export const GetModelsRequestSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 6);
+  messageDesc(file_inference_v1_inference, 4);
 
 /**
  * Describes the message inference.v1.api.GetModelsResponse.
  * Use `create(GetModelsResponseSchema)` to create a new message.
  */
 export const GetModelsResponseSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 7);
+  messageDesc(file_inference_v1_inference, 5);
 
 /**
  * Describes the message inference.v1.api.Task.
  * Use `create(TaskSchema)` to create a new message.
  */
 export const TaskSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 8);
+  messageDesc(file_inference_v1_inference, 6);
 
 /**
  * Describes the message inference.v1.api.Model.
  * Use `create(ModelSchema)` to create a new message.
  */
 export const ModelSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 9);
+  messageDesc(file_inference_v1_inference, 7);
 
 /**
  * Describes the message inference.v1.api.TaskResult.
  * Use `create(TaskResultSchema)` to create a new message.
  */
 export const TaskResultSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 10);
+  messageDesc(file_inference_v1_inference, 8);
 
 /**
  * Describes the message inference.v1.api.Chunk.
  * Use `create(ChunkSchema)` to create a new message.
  */
 export const ChunkSchema = /*@__PURE__*/
-  messageDesc(file_inference_v1_inference, 11);
+  messageDesc(file_inference_v1_inference, 9);
 
 /**
  * Describes the enum inference.v1.api.TaskStatus.

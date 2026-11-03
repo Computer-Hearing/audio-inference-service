@@ -5,19 +5,9 @@ package inference.v1.api;
 option go_package = "audio-inference-service/gen/inference/v1;inferencev1";
 
 service InferenceService {
-  rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc GetModels(GetModelsRequest) returns (GetModelsResponse);
-}
-
-// RegisterRequest запрашивает регистрацию. Пустой username — сгенерировать анонимный
-// RegisterResponse возвращает сгенеренное уникальное имя пользователя + куку с ней
-message RegisterRequest {
-  string username = 1;
-}
-message RegisterResponse {
-  string username = 1;
 }
 
 // CreateTaskRequest - бек принимает аудио файл открытый, в байтах; имя файла (с расширением), а также имя модели

@@ -20,7 +20,7 @@ import {
 } from './gen/inference/v1/inference_pb.js';
 
 // Запросы идут на <BASE_URL>/inference.v1.api.InferenceService/<Method>,
-// например /inference/inference.v1.api.InferenceService/GetModels.
+// например /inference.v1.api.InferenceService/GetModels.
 const API_PREFIX = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const transport = createConnectTransport({
@@ -28,9 +28,6 @@ const transport = createConnectTransport({
   // Бинарный protobuf вместо JSON: аудио уходит полем bytes, и в JSON оно
   // раздувалось бы на ~33% из-за base64 — упёрлись бы в лимит бэкенда раньше.
   useBinaryFormat: true,
-  // Сессия держится на HttpOnly-куке username — её нужно отправлять
-  // с каждым запросом, как раньше делал credentials: 'include'.
-  fetch: (input, init) => globalThis.fetch(input, { ...init, credentials: 'include' }),
 });
 
 const client = createClient(InferenceService, transport);
@@ -53,40 +50,6 @@ function errorLog(method, e) {
     status: Code[err.code] || 'error',
     body: { code: Code[err.code], message: err.rawMessage },
   };
-}
-
-// -----------------------------------------------------------------------
-// Сессия пользователя.
-// Register с пустым username генерирует анонимное имя вида
-// "Anonim-XXXXXXXXXXXXX-1234567890" и кладёт его в HttpOnly-куку.
-// Прочитать её из JS нельзя и не нужно — достаточно, что браузер её хранит.
-//
-// Если кука уже существует, бэкенд отвечает кодом AlreadyExists (раньше
-// это был 409 Conflict) — это не ошибка, а сигнал "сессия уже есть".
-// -----------------------------------------------------------------------
-export async function ensureSession() {
-  try {
-    await client.register({ username: '' });
-    return true;
-  } catch (e) {
-    if (e instanceof ConnectError && e.code === Code.AlreadyExists) return true;
-    console.warn('ensureSession: request failed', e);
-    return false;
-  }
-}
-
-// Вызов с авто-восстановлением сессии: если бэкенд ответил Unauthenticated
-// (кука не пришла/протухла) — один раз регистрируемся заново и повторяем.
-async function authorized(call) {
-  try {
-    return await call();
-  } catch (e) {
-    if (e instanceof ConnectError && e.code === Code.Unauthenticated) {
-      const recovered = await ensureSession();
-      if (recovered) return call();
-    }
-    throw e;
-  }
 }
 
 // -----------------------------------------------------------------------
@@ -116,7 +79,7 @@ export function modelChunkSeconds(m) {
 
 export async function getModels() {
   try {
-    const res = await authorized(() => client.getModels({}));
+    const res = await client.getModels({});
     // Хранилище моделей на бэкенде — map, порядок в ответе случайный.
     // Сортируем, чтобы стрелки переключали модели в стабильном порядке.
     return [...res.models].sort((a, b) => modelLabel(a).localeCompare(modelLabel(b)));
@@ -135,9 +98,7 @@ export async function createTask(file, modelName, onRaw) {
   const method = 'InferenceService/CreateTask';
 
   try {
-    const res = await authorized(() =>
-      client.createTask({ audioFile, filename: file.name, modelName })
-    );
+    const res = await client.createTask({ audioFile, filename: file.name, modelName });
     if (onRaw) onRaw({ url: method, status: 'OK', body: toJson(CreateTaskResponseSchema, res) });
     return res.task; // { taskId, status, model }
   } catch (e) {
@@ -162,7 +123,7 @@ export async function pollTask(taskId, onRaw) {
 
   while (true) {
     try {
-      const res = await authorized(() => client.getTask({ taskId }));
+      const res = await client.getTask({ taskId });
       if (onRaw) onRaw({ url: method, status: 'OK', body: toJson(GetTaskResponseSchema, res) });
 
       const task = res.task;
