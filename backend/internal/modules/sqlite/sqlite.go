@@ -22,7 +22,7 @@ func New(db *sql.DB) *SqliteTaskManager {
 }
 
 func (m *SqliteTaskManager) GetTask(
-	ctx context.Context, taskID domain.TaskID, username domain.Username) (*domain.Task, error) {
+	ctx context.Context, taskID domain.TaskID) (*domain.Task, error) {
 
 	if err := taskID.IsValid(); err != nil {
 		return nil, err
@@ -33,9 +33,9 @@ func (m *SqliteTaskManager) GetTask(
 		resultJSON sql.NullString
 		model      string
 	)
-	query := `SELECT status, result, model FROM tasks WHERE username = ? and id = ?`
+	query := `SELECT status, result, model FROM tasks WHERE id = ?`
 
-	err := m.db.QueryRowContext(ctx, query, username, taskID).Scan(&status, &resultJSON, &model)
+	err := m.db.QueryRowContext(ctx, query, taskID).Scan(&status, &resultJSON, &model)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, pkg.NewNotFoundWithDetails(
@@ -70,13 +70,9 @@ func (m *SqliteTaskManager) GetTask(
 }
 
 func (m *SqliteTaskManager) CreateTask(
-	ctx context.Context, username domain.Username,
-	taskID domain.TaskID, payload domain.AudioTaskPayload) error {
+	ctx context.Context, taskID domain.TaskID, payload domain.AudioTaskPayload) error {
 	// Валидация всех полей
 	details := make(map[string]string)
-	if string(username) == "" {
-		details["username"] = "cannot be empty"
-	}
 	if string(taskID) == "" {
 		details["taskID"] = "cannot be empty"
 	}
@@ -99,12 +95,12 @@ func (m *SqliteTaskManager) CreateTask(
 	}
 
 	query := `
-		INSERT INTO tasks (id, username, status, model, chunks, created_at, updated_at) 
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		INSERT INTO tasks (id, status, model, chunks, created_at, updated_at) 
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`
 
 	_, err = m.db.ExecContext(ctx, query,
-		taskID, username,
+		taskID,
 		dto.TaskStatusToString(domain.TaskStatusPending),
 		payload.ModelName, string(chunksJSON),
 	)

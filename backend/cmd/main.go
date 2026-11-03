@@ -85,7 +85,6 @@ func main() {
 		Logger:       logger,
 	})
 	path, connectHandler := inferencev1connect.NewInferenceServiceHandler(h,
-		connect.WithInterceptors(handlers.NewUsernameInterceptor()),
 		connect.WithReadMaxBytes(4<<20+64<<10),
 	)
 

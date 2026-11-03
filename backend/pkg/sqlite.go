@@ -72,7 +72,6 @@ func tables(db *sql.DB) error {
 	query := `
 		CREATE TABLE IF NOT EXISTS tasks (
     		id TEXT PRIMARY KEY,
-    		username TEXT NOT NULL,
     		status TEXT NOT NULL,          -- 'pending', 'processing', 'success', 'failure'
     		model TEXT NOT NULL, 		   -- модель для инференса
     		chunks TEXT,                   -- JSON: chunks.AudioChunks

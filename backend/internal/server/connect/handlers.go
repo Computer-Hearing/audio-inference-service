@@ -12,8 +12,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"os"
 
 	"connectrpc.com/connect"
 )
@@ -42,14 +40,6 @@ func (h *Handlers) CreateTask(
 	ctx context.Context, c *connect.Request[v1.CreateTaskRequest]) (
 	*connect.Response[v1.CreateTaskResponse], error) {
 
-	username, ok := GetUsernameFromContext(ctx)
-	if !ok {
-		return nil, pkg.ConnectError(pkg.NewUnauthorizedError("user is not authenticated"))
-	}
-	if err := username.IsValid(); err != nil {
-		return nil, pkg.ConnectError(err)
-	}
-
 	available, err := h.catalog.IsAvailable(ctx, c.Msg.ModelName)
 	if err != nil {
 		// Тритон недоступен — отклоняем запрос
@@ -67,7 +57,7 @@ func (h *Handlers) CreateTask(
 	}
 
 	// генерируем таск id
-	taskID := domain.GenerateTaskID(username.String())
+	taskID := domain.GenerateTaskID()
 
 	modelConfig, ok := h.modelStorage.Get(c.Msg.ModelName)
 	if !ok {
@@ -89,11 +79,11 @@ func (h *Handlers) CreateTask(
 	h.logger.Debug("audio chunks splitted", "task_id", taskID.String(), "chunks len", (len(ch.Layers[0].Chunks) + len(ch.Layers[1].Chunks)))
 
 	payload := domain.AudioTaskPayload{ModelName: c.Msg.ModelName, Chunks: *ch}
-	if err := h.taskLoader.CreateTask(ctx, username, taskID, payload); err != nil {
+	if err := h.taskLoader.CreateTask(ctx, taskID, payload); err != nil {
 		h.logger.Error("create task error", "task_id", taskID.String(), "error", err.Error())
 		return nil, pkg.ConnectError(fmt.Errorf("create task: %w", err))
 	}
-	h.logger.Info("create task successful", "task_id", taskID.String(), "username", username.String())
+	h.logger.Info("create task successful", "task_id", taskID.String())
 
 	// Отдаем ответ
 	return &connect.Response[v1.CreateTaskResponse]{
@@ -111,20 +101,12 @@ func (h *Handlers) GetTask(
 	ctx context.Context, c *connect.Request[v1.GetTaskRequest]) (
 	*connect.Response[v1.GetTaskResponse], error) {
 
-	username, ok := GetUsernameFromContext(ctx)
-	if !ok {
-		return nil, pkg.ConnectError(pkg.NewUnauthorizedError("user is not authenticated"))
-	}
-	if err := username.IsValid(); err != nil {
-		return nil, pkg.ConnectError(err)
-	}
-
 	taskID := domain.TaskID(c.Msg.TaskId)
 	if err := taskID.IsValid(); err != nil {
 		return nil, pkg.ConnectError(err)
 	}
 
-	task, err := h.taskLoader.GetTask(ctx, taskID, username)
+	task, err := h.taskLoader.GetTask(ctx, taskID)
 	if err != nil {
 		return nil, pkg.ConnectError(fmt.Errorf("get task: %w", err))
 	}
@@ -136,47 +118,9 @@ func (h *Handlers) GetTask(
 	}, nil
 }
 
-// Register регистрирует пользователя и выставляет username-cookie.
-func (h *Handlers) Register(
-	ctx context.Context, c *connect.Request[v1.RegisterRequest]) (
-	*connect.Response[v1.RegisterResponse], error) {
-
-	if existing, ok := cookieValue(c.Header(), pkg.UsernameCookieKey); ok {
-		return nil, pkg.ConnectError(
-			pkg.NewConflictError(fmt.Sprintf("user already authenticated: %s", existing)),
-		)
-	}
-
-	username := pkg.UsernameGenerator(c.Msg.Username)
-	h.logger.Debug("Generating username", "username", username)
-
-	cookie := &http.Cookie{
-		Name:     pkg.UsernameCookieKey,
-		Value:    username,
-		Path:     "/",
-		MaxAge:   2147483647,
-		HttpOnly: true,
-		Secure:   os.Getenv("ENV") == "production",
-		SameSite: http.SameSiteLaxMode,
-	}
-
-	resp := connect.NewResponse(&v1.RegisterResponse{Username: username})
-	resp.Header().Add("Set-Cookie", cookie.String())
-
-	return resp, nil
-}
-
 func (h *Handlers) GetModels(
-	ctx context.Context, _ *connect.Request[v1.GetModelsRequest]) (
+	_ context.Context, _ *connect.Request[v1.GetModelsRequest]) (
 	*connect.Response[v1.GetModelsResponse], error) {
-
-	username, ok := GetUsernameFromContext(ctx)
-	if !ok {
-		return nil, pkg.ConnectError(pkg.NewUnauthorizedError("user is not authenticated"))
-	}
-	if err := username.IsValid(); err != nil {
-		return nil, pkg.ConnectError(err)
-	}
 
 	// получаем модели из хранилища
 	storageModels := h.modelStorage.GetAll()

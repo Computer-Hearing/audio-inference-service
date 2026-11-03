@@ -9,10 +9,10 @@ import (
 // TaskManager - реализация должна уметь работать с задачами в бд, операции соответствуют методам
 type TaskManager interface {
 	// GetTask - получить задачу: её статус и результат инференса, если он уже сохранён
-	GetTask(ctx context.Context, taskID domain.TaskID, username domain.Username) (*domain.Task, error)
+	GetTask(ctx context.Context, taskID domain.TaskID) (*domain.Task, error)
 
 	// CreateTask - создать задачу, то есть создать в бд строку со статусом pending
-	CreateTask(ctx context.Context, username domain.Username, taskID domain.TaskID, payload domain.AudioTaskPayload) error
+	CreateTask(ctx context.Context, taskID domain.TaskID, payload domain.AudioTaskPayload) error
 
 	// GetAndMarkProcessing берет строки из бд, меняет в них поле статус на processing или берет строки со статусом
 	// processing если были. Они будут уже processing, если что-то упало (и не дошло до failure статуса)

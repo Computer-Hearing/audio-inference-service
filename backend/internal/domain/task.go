@@ -3,8 +3,6 @@ package domain
 import (
 	"audio-inference-service/internal/modules/audio"
 	"audio-inference-service/pkg"
-	"crypto/md5"
-	"fmt"
 
 	"github.com/google/uuid"
 )
@@ -33,8 +31,8 @@ func (t TaskID) IsValid() error {
 }
 
 // GenerateTaskID - генерирует новое айди задачи
-func GenerateTaskID(userName string) TaskID {
-	return TaskID(fmt.Sprintf("%x", md5.Sum([]byte(userName+uuid.NewString()))))
+func GenerateTaskID() TaskID {
+	return TaskID(uuid.NewString())
 }
 
 // TaskStatus статус задачи
