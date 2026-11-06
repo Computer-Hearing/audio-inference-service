@@ -6,13 +6,14 @@ import (
 	"audio-inference-service/internal/modules/catalog"
 	"audio-inference-service/internal/modules/models"
 	"audio-inference-service/internal/modules/predictor"
-	"audio-inference-service/internal/modules/sqlite"
+	taskredis "audio-inference-service/internal/modules/redis"
 	"audio-inference-service/internal/modules/taskpipe"
 	"audio-inference-service/internal/modules/triton"
 	handlers "audio-inference-service/internal/server/connect"
 	"audio-inference-service/pkg"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -38,13 +40,18 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
-	db, err := pkg.SqliteOpen(cfg.DBPath, nil)
-	if err != nil {
-		logger.Error("failed to open sqlite database", "err", err.Error())
+	redisClient := goredis.NewClient(&goredis.Options{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	})
+	defer redisClient.Close()
+
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		logger.Error("failed to connect to redis", "addr", cfg.RedisAddr, "err", err.Error())
 		os.Exit(1)
 	}
-	defer db.Close()
-	logger.Info("sqlite database opened", "db_path", cfg.DBPath)
+	logger.Info("redis connected", "addr", cfg.RedisAddr)
 
 	tritonClient, err := triton.NewTritonClient(triton.DefaultConfig(cfg.TritonAddr))
 	if err != nil {
@@ -68,15 +75,33 @@ func main() {
 		syncer.Run(ctx)
 	}()
 
-	taskManager := sqlite.New(db)
+	taskManager := taskredis.New(&taskredis.Options{
+		Client:   redisClient,
+		Stream:   cfg.TaskStream,
+		Group:    cfg.TaskGroup,
+		Consumer: consumerName(),
+		TaskTTL:  cfg.TaskTTL,
+	})
+	if err := taskManager.EnsureGroup(ctx); err != nil {
+		logger.Error("failed to create task consumer group", "err", err.Error())
+		os.Exit(1)
+	}
+
 	predict := predictor.New(&predictor.Options{
 		TritonConnector: tritonClient,
 		TaskManager:     taskManager,
 		Logger:          logger,
 	})
 
-	// Запускаем воркеры и диспетчера задач
-	taskpipe.StartPipeline(ctx, logger, taskManager, predict)
+	// Запускаем воркеры, читателя очереди и восстановление зависших задач
+	taskpipe.StartPipeline(ctx, taskpipe.Options{
+		Logger:        logger,
+		Store:         taskManager,
+		Queue:         taskManager,
+		Predictor:     predict,
+		AckWait:       cfg.TaskAckWait,
+		MaxDeliveries: cfg.TaskMaxDeliveries,
+	})
 
 	h := handlers.New(&handlers.Options{
 		TaskLoader:   taskManager,
@@ -119,6 +144,16 @@ func main() {
 	}
 }
 
+// consumerName уникален для каждого запуска процесса: старые записи в PEL
+// остаются за прежним consumer'ом и подбираются через XAUTOCLAIM.
+func consumerName() string {
+	host, err := os.Hostname()
+	if err != nil || host == "" {
+		host = "backend"
+	}
+	return fmt.Sprintf("%s-%d", host, os.Getpid())
+}
+
 func printConfig(cfg *config.Config, logger *slog.Logger) {
 	if cfg == nil {
 		logger.Debug("config is nil")
@@ -129,6 +164,7 @@ func printConfig(cfg *config.Config, logger *slog.Logger) {
 		slog.String("ENV", cfg.Env),
 		slog.String("LogLevel", cfg.LogLevel),
 		slog.String("HTTP_ADDR", cfg.HTTPAddr),
-		slog.String("DB_PATH", cfg.DBPath),
+		slog.String("REDIS_ADDR", cfg.RedisAddr),
+		slog.Duration("TASK_TTL", cfg.TaskTTL),
 		slog.String("TRITON_ADDR", cfg.TritonAddr))
 }

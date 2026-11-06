@@ -23,6 +23,26 @@ services:
       - triton/models:/models
     command: ["tritonserver", "--model-store=/models"]
 
+  redis:
+    networks:
+      - inference-net
+    container_name: inference_redis
+    image: redis:7-alpine
+    command: [
+      "redis-server",
+      "--appendonly", "yes",
+      "--maxmemory", "512mb",
+      "--maxmemory-policy", "noeviction"
+    ]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: always
+
   backend:
     networks:
       - inference-net
@@ -36,13 +56,21 @@ services:
       ENV: ${ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       HTTP_ADDR: ${HTTP_ADDR:-:6767}
-      DB_PATH: ${DB_PATH:-sqlite.db}
+      REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      TASK_TTL: ${TASK_TTL:-1h}
+      TASK_STREAM: ${TASK_STREAM:-tasks}
+      TASK_GROUP: ${TASK_GROUP:-inference}
+      TASK_ACK_WAIT: ${TASK_ACK_WAIT:-10m}
+      TASK_MAX_DELIVERIES: ${TASK_MAX_DELIVERIES:-3}
       TRITON_ADDR: ${TRITON_ADDR:-triton:8001}
-    volumes:
-      - backend_data:/app
     restart: always
     depends_on:
-      - triton
+      triton:
+        condition: service_started
+      redis:
+        condition: service_healthy
 
   caddy:
     networks:
@@ -63,4 +91,4 @@ services:
       - backend
 
 volumes:
-  backend_data:
+  redis_data:
