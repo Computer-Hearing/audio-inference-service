@@ -108,10 +108,22 @@ func filterUsable(models []ModelInfo) []ModelInfo {
 	return usable
 }
 
-// matchesContract проверяет, что модель принимает входной аудио-тензор
+// matchesContract проверяет, что модель работает по аудио-контракту:
+// принимает RAW_AUDIO/UINT8 и отдаёт общий выход target_output.
 func matchesContract(m ModelInfo) bool {
+	hasInput := false
 	for _, in := range m.Inputs {
 		if in.Name == pkg.RawAudioInputName && in.Datatype == pkg.RawAudioInputDatatype {
+			hasInput = true
+			break
+		}
+	}
+	if !hasInput {
+		return false
+	}
+
+	for _, out := range m.Outputs {
+		if out.Name == pkg.TargetOutputName && out.Datatype == pkg.TargetOutputDatatype {
 			return true
 		}
 	}

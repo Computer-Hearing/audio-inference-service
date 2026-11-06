@@ -19,14 +19,20 @@ const (
 	// Triton
 	CategoryOutputName    = "category_output"
 	TargetOutputName      = "target_output"
-	DefaultModelName      = "cnn_predict_pipeline_2"
+	TargetOutputDatatype  = "TYPE_FP32"
 	RawAudioInputName     = "RAW_AUDIO"
 	RawAudioInputDatatype = "TYPE_UINT8"
 	MaxTritonConcurrency  = 8
 )
 
-// ChunkOffsetsSeconds сдвиги нарезки аудио в секундах для слоёв сегментации
-var ChunkOffsetsSeconds = []int{0, 1}
+// ChunkOffsets возвращает сдвиги (слои) нарезки для заданной длины чанка.
+// При чанке 1s слой со сдвигом на 1s ничего не даст при анализе - убираем
+func ChunkOffsets(secondsPerChunk int) []int {
+	if secondsPerChunk <= 1 {
+		return []int{0}
+	}
+	return []int{0, 1}
+}
 
 func GetLoglevel(level string) slog.Level {
 	switch level {

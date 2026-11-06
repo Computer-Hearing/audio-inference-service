@@ -58,7 +58,6 @@ func (p *Predictor) ProcessTask(ctx context.Context, job domain.TaskPayload) err
 	// Обновляем статус в БД
 	if inferErr != nil {
 		if err := p.taskManager.StatusFailure(ctx, job.TaskID, result); err != nil {
-			// TODO: плохо сделано, если была ошибка в инференсе и ошибка в бд, то выграет ошибка бд, хотя на нее тут в принципе похуй в отлчии от ошибки инференса
 			return fmt.Errorf("set failure status: %w", err)
 		}
 		return fmt.Errorf("audio processing failed: %w", inferErr)
@@ -154,10 +153,8 @@ func runRawAudioInference(
 				Shape:    []int64{1, int64(len(chunk))}, // max_batch_size:0 → без добавления батча
 			},
 		},
-		Outputs: []*gen.ModelInferRequest_InferRequestedOutputTensor{
-			{Name: pkg.CategoryOutputName},
-			{Name: pkg.TargetOutputName},
-		},
+		// Outputs не перечисляем: Triton вернёт все выходы, объявленные у модели.
+		// Так запрос работает и для моделей с одним target_output, и с дополнительным category_output
 		RawInputContents: [][]byte{chunk},
 	}
 
@@ -182,22 +179,18 @@ func parseResponse(resp *gen.ModelInferResponse) (*domain.InferenceResult, error
 
 		switch out.Name {
 		case pkg.CategoryOutputName:
-			if len(values) != 5 {
-				return nil, fmt.Errorf("unexpected category_output size: %d", len(values))
-			}
+			// Дополнительный выход: есть только у части моделей.
 			result.CategoryLogits = values
 		case pkg.TargetOutputName:
-			if len(values) != 7 {
-				return nil, fmt.Errorf("unexpected target_output size: %d", len(values))
-			}
+			// Общий выход: обязан быть у любой модели.
 			result.TargetLogits = values
 		default:
-			return nil, fmt.Errorf("unexpected output name: %s", out.Name)
+			slog.Debug("ignoring unexpected model output", "name", out.Name)
 		}
 	}
 
-	if result.CategoryLogits == nil || result.TargetLogits == nil {
-		return nil, fmt.Errorf("incomplete response: missing one or more expected outputs")
+	if result.TargetLogits == nil {
+		return nil, fmt.Errorf("incomplete response: missing %s", pkg.TargetOutputName)
 	}
 
 	return result, nil

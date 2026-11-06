@@ -421,6 +421,7 @@ export default function Main() {
             duration={duration}
             currentTime={currentTime}
             chunkSeconds={chunkSeconds}
+            modelName={modelId(analyzedModel)}
             selectedKey={selection?.key}
             onSelectChunk={handleSelectChunk}
           />
