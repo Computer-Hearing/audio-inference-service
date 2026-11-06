@@ -1,6 +1,6 @@
 name: "road_rnn_99k_09915acc_1"
 backend: "python"
-max_batch_size: 0
+max_batch_size: 1
 
 input [
   {
