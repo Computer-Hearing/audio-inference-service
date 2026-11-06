@@ -3,11 +3,21 @@
 // Общие сведения о чанках, которые нужны и рядам чанков под гистограммой
 // (Waveform.jsx), и карточке с подробностями о чанке (ChunkDetails.jsx).
 
-// Названия классов модели — по порядку выходов category_output / target_output.
-export const CATEGORY_LABELS = ['car', 'emv', 'motorcycle', 'tram', 'truck'];
-export const TARGET_LABELS = [
-  'acceleration', 'bell', 'braking', 'horn', 'idling', 'passing', 'siren',
-];
+// Подписи классов. Пока захардкожены по имени модели: у моделей из других
+// проектов свои классы, поэтому запись добавляется сюда при подключении модели.
+// Если записи нет — показываем "class N", чтобы UI не ломался.
+const MODEL_LABELS = {
+  cnn_predict_pipeline_2: {
+    category: ['car', 'emv', 'motorcycle', 'tram', 'truck'],
+    target: ['acceleration', 'bell', 'braking', 'horn', 'idling', 'passing', 'siren'],
+  },
+};
+
+export function labelsFor(modelName, kind, count) {
+  const labels = MODEL_LABELS[modelName]?.[kind];
+  if (labels) return labels;
+  return Array.from({ length: count || 0 }, (_, i) => `class ${i}`);
+}
 
 export function argmaxIndex(arr) {
   if (!arr || !arr.length) return -1;

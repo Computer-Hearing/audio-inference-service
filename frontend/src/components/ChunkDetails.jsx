@@ -7,8 +7,7 @@
 // кнопки: прослушать фрагмент, скачать его в WAV и закрыть карточку.
 import { useEffect, useRef, useState } from 'react';
 import {
-  CATEGORY_LABELS,
-  TARGET_LABELS,
+  labelsFor,
   argmaxIndex,
   chunkKey,
   chunkRange,
@@ -112,12 +111,18 @@ export default function ChunkDetails({
   const offset = chunk.offset || 0;
   const { start, end } = chunkRange(offset, chunk.chunkIndex, chunkSeconds, duration);
   const hasError = !!chunk.errorMessage;
-  const hasPrediction = chunk.category?.length > 0 && chunk.target?.length > 0;
+  // target_output есть у всех моделей, category_output — только у части.
+  const hasCategory = chunk.category?.length > 0;
+  const hasTarget = chunk.target?.length > 0;
+  const hasPrediction = hasCategory || hasTarget;
 
   const catProbs = softmax(chunk.category);
   const tgtProbs = softmax(chunk.target);
   const catIdx = argmaxIndex(chunk.category);
   const tgtIdx = argmaxIndex(chunk.target);
+
+  const catLabels = labelsFor(modelName, 'category', chunk.category?.length || 0);
+  const tgtLabels = labelsFor(modelName, 'target', chunk.target?.length || 0);
 
   // Закрытие по Esc
   useEffect(() => {
@@ -215,25 +220,33 @@ export default function ChunkDetails({
       {hasPrediction && (
         <>
           <div className="chunk-details-summary">
-            <div className="chunk-details-fact">
-              <span className="muted">category</span>
-              <span className="chunk-details-fact-value">
-                {CATEGORY_LABELS[catIdx] || '?'}
-              </span>
-              <span className="chunk-details-fact-pct">{formatPct(catProbs[catIdx])}</span>
-            </div>
-            <div className="chunk-details-fact">
-              <span className="muted">sound</span>
-              <span className="chunk-details-fact-value">
-                {TARGET_LABELS[tgtIdx] || '?'}
-              </span>
-              <span className="chunk-details-fact-pct">{formatPct(tgtProbs[tgtIdx])}</span>
-            </div>
+            {hasCategory && (
+              <div className="chunk-details-fact">
+                <span className="muted">category</span>
+                <span className="chunk-details-fact-value">
+                  {catLabels[catIdx] || '?'}
+                </span>
+                <span className="chunk-details-fact-pct">{formatPct(catProbs[catIdx])}</span>
+              </div>
+            )}
+            {hasTarget && (
+              <div className="chunk-details-fact">
+                <span className="muted">sound</span>
+                <span className="chunk-details-fact-value">
+                  {tgtLabels[tgtIdx] || '?'}
+                </span>
+                <span className="chunk-details-fact-pct">{formatPct(tgtProbs[tgtIdx])}</span>
+              </div>
+            )}
           </div>
 
           <div className="chunk-details-dists">
-            <Distribution title="category" labels={CATEGORY_LABELS} logits={chunk.category} />
-            <Distribution title="sound" labels={TARGET_LABELS} logits={chunk.target} />
+            {hasCategory && (
+              <Distribution title="category" labels={catLabels} logits={chunk.category} />
+            )}
+            {hasTarget && (
+              <Distribution title="sound" labels={tgtLabels} logits={chunk.target} />
+            )}
           </div>
         </>
       )}

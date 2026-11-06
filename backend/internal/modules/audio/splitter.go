@@ -68,8 +68,9 @@ func Split(opts Options) (*AudioChunks, error) {
 	}
 
 	// идем по слоям
-	layers := make([]AudioLayer, 0, len(pkg.ChunkOffsetsSeconds))
-	for _, offset := range pkg.ChunkOffsetsSeconds {
+	offsets := pkg.ChunkOffsets(secondsPerChunk)
+	layers := make([]AudioLayer, 0, len(offsets))
+	for _, offset := range offsets {
 		// trim - сколько по времени этот слой будет
 		// offset от какого места ffmpeg будет резать по звуку (0 - 0s, 1 - 1s, ...)
 		trim := 0.0
