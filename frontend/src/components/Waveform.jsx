@@ -14,7 +14,7 @@
 // под диаграммой карточку с подробностями о нём (ChunkDetails.jsx).
 import { useEffect, useMemo, useRef } from 'react';
 import { computeBars } from '../audio.js';
-import { CATEGORY_LABELS, TARGET_LABELS, argmaxIndex, chunkKey, chunkRange } from '../chunks.js';
+import { labelsFor, argmaxIndex, chunkKey, chunkRange } from '../chunks.js';
 
 // Цветовая карта амплитуды: тихо (тёмно-синий) → громко (красный),
 // стандартная для аудио-визуализаторов логика "холодный → тёплый".
@@ -92,6 +92,7 @@ export default function Waveform({
   duration: playerDuration,
   currentTime,
   chunkSeconds,
+  modelName,
   selectedKey,
   onSelectChunk,
 }) {
@@ -175,6 +176,15 @@ export default function Waveform({
         const width = ((g.end - g.start) / duration) * 100;
         const isActive = currentTime >= g.start && currentTime < g.end;
         const isSelected = g.items.some((ch) => chunkKey(ch) === selectedKey);
+        // target_output есть у всех моделей, category_output — только у части.
+        const item = g.items[0];
+        const hasCategory = item?.category?.length > 0;
+        const hasTarget = item?.target?.length > 0;
+        const catLabels = labelsFor(modelName, 'category', item?.category?.length || 0);
+        const tgtLabels = labelsFor(modelName, 'target', item?.target?.length || 0);
+        const countBadge = g.count > 1 && !g.error
+          ? <span className="chunk-box-count"> ×{g.count}</span>
+          : null;
 
         return (
           <div
@@ -195,11 +205,18 @@ export default function Waveform({
               }
             }}
           >
-            <div className="chunk-box-category">
-              {CATEGORY_LABELS[g.catIdx] || '?'}
-              {g.count > 1 && !g.error && <span className="chunk-box-count"> ×{g.count}</span>}
-            </div>
-            <div className="chunk-box-target">{TARGET_LABELS[g.tgtIdx] || '?'}</div>
+            {hasCategory && (
+              <div className="chunk-box-category">
+                {catLabels[g.catIdx] || '?'}
+                {countBadge}
+              </div>
+            )}
+            {hasTarget && (
+              <div className="chunk-box-target">
+                {tgtLabels[g.tgtIdx] || '?'}
+                {!hasCategory && countBadge}
+              </div>
+            )}
             {g.error && <div className="chunk-box-error">error</div>}
           </div>
         );

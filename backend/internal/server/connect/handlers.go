@@ -76,7 +76,12 @@ func (h *Handlers) CreateTask(
 		h.logger.Error("split audio chunks", "error", err.Error)
 		return nil, pkg.ConnectError(fmt.Errorf("audio split: %w", err))
 	}
-	h.logger.Debug("audio chunks splitted", "task_id", taskID.String(), "chunks len", (len(ch.Layers[0].Chunks) + len(ch.Layers[1].Chunks)))
+
+	totalChunks := 0
+	for _, layer := range ch.Layers {
+		totalChunks += len(layer.Chunks)
+	}
+	h.logger.Debug("audio chunks splitted", "task_id", taskID.String(), "chunks len", totalChunks)
 
 	payload := domain.AudioTaskPayload{ModelName: c.Msg.ModelName, Chunks: *ch}
 	if err := h.taskLoader.CreateTask(ctx, taskID, payload); err != nil {
