@@ -1,0 +1,20 @@
+name: "road_rnn_99k_09915acc_1"
+backend: "python"
+max_batch_size: 1
+
+input [
+  {
+    name: "RAW_AUDIO"
+    data_type: TYPE_UINT8
+    dims: [ -1 ]
+    allow_ragged_batch: true
+  }
+]
+
+output [
+  {
+    name: "target_output"
+    data_type: TYPE_FP32
+    dims: [ 3 ]
+  }
+]

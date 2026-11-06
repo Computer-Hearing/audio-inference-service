@@ -1,4 +1,4 @@
-name: "torch_audio_cnn"
+name: "traffic_mobilenet_w1_f1m0922_e110_infer"
 backend: "onnxruntime"
 max_batch_size: 8
 
