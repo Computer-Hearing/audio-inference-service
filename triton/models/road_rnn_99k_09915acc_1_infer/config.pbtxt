@@ -1,6 +1,6 @@
 name: "road_rnn_99k_09915acc_1_infer"
 backend: "onnxruntime"
-max_batch_size: 1
+max_batch_size: 0
 
 default_model_filename: "road_rnn_099acc_1.onnx"
 
