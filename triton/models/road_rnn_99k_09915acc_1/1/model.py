@@ -83,8 +83,7 @@ class TritonPythonModel:
                 mel_spec = (mel_spec - self.mel_mean) / (self.mel_std + 1e-8)
 
                 # Транспонируем для RNN (173, 256) и делаем contiguous
-                mel_spec = np.ascontiguousarray(mel_spec.T)
-                mel_spec = np.expand_dims(mel_spec, axis=0).astype(np.float32)  # (1, 173, 256)
+                mel_spec = np.ascontiguousarray(mel_spec.T).astype(np.float32)  # (173, 256)
 
                 processed.append(mel_spec)
 
