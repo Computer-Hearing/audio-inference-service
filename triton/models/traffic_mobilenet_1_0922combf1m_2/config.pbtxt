@@ -1,4 +1,4 @@
-name: "cnn_predict_pipeline_2"
+name: "traffic_mobilenet_1_0922combf1m_2"
 backend: "python"
 max_batch_size: 8
 
