@@ -54,8 +54,8 @@ type TaskPayload struct {
 
 // AudioTaskPayload данные аудио-задачи
 type AudioTaskPayload struct {
-	ModelName string
-	Chunks    audio.AudioChunks
+	ModelName string            `json:"model_name"`
+	Chunks    audio.AudioChunks `json:"chunks"`
 }
 
 // TaskDelivery - сообщение очереди: id задачи и чек для подтверждения обработки.
