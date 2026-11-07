@@ -4,11 +4,10 @@ inputs:
     paths:
       - inference/v1
 plugins:
+  # protoc-gen-es v2 генерирует и сообщения, и описание сервиса
+  # (InferenceService) — отдельный плагин protoc-gen-connect-es для
+  # @connectrpc/connect v2 не нужен (он генерировал код под старый v1)
   - local: protoc-gen-es
     out: ../frontend/src/gen
     opt:
-      - target=js
-  - local: protoc-gen-connect-es
-    out: ../frontend/src/gen
-    opt:
-      - target=js
+      - target=ts

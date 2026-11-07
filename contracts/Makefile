@@ -45,7 +45,7 @@ install-buf-npm:
 # Глобальная установка JS-плагинов buf — попадают в глобальный bin npm,
 # который уже в PATH, поэтому buf их находит без доп. настройки
 install-js-npm:
-	npm install -g @bufbuild/protoc-gen-es @connectrpc/protoc-gen-connect-es
+	npm install -g @bufbuild/protoc-gen-es
 
 # Установить всё нужное для генерации, требует npm
 install-all: install-buf-npm install-js-npm

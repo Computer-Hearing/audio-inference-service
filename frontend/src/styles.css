@@ -1,0 +1,759 @@
+/* src/styles.css
+ *
+ * Стили инференса. Подключаются внутрь Shadow DOM (см. src/index.tsx), поэтому
+ * все правила, включая общие для button/h1/*, действуют только на сам
+ * инференс и не задевают страницу, в которую он встроен.
+ *
+ * Цвета, шрифты и скругления берутся из дизайн-токенов портала
+ * (portal/src/shared/styles/tokens.css): CSS-переменные наследуются через
+ * границу Shadow DOM. Второе значение в var(...) — запасное, на случай
+ * страницы без токенов (npm run dev); оно совпадает со значением портала.
+ */
+
+:host {
+  --ai-bg: var(--bg, #000);
+  --ai-surface: var(--surface-1, #100f0d);
+  --ai-surface-2: var(--surface-2, #151311);
+  --ai-surface-hover: var(--surface-hover, #1a1815);
+  --ai-border: var(--border, #2a2622);
+  --ai-border-soft: var(--border-soft, #201d1a);
+  --ai-border-strong: var(--border-strong, #35302a);
+  --ai-border-hover: var(--border-hover, #554d44);
+  --ai-text: var(--text, #eeeae4);
+  --ai-text-2: var(--text-2, #d2ccc3);
+  --ai-text-3: var(--text-3, #bbb4a9);
+  --ai-muted: var(--text-muted, #a1998d);
+  --ai-faint: var(--text-faint, #463f37);
+  --ai-accent: var(--accent, #64cbbf);
+  --ai-accent-hover: var(--accent-hover, #8edfd5);
+  --ai-accent-soft: var(--accent-soft, rgba(100, 203, 191, 0.5));
+  --ai-accent-ring: var(--accent-ring, rgba(100, 203, 191, 0.2));
+  --ai-error: #f58d83; /* = --project-siren портала */
+  --ai-font: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
+  --ai-radius: var(--radius-card, 14px);
+  --ai-radius-sm: var(--radius-control, 8px);
+
+  display: block;
+  color: var(--ai-text);
+  font-family: var(--ai-font);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.app {
+  position: relative;
+}
+
+.container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ai-accent);
+  outline-offset: 2px;
+}
+
+/* Шапка — только на странице разработки (в портале заголовок рисует портал) */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ai-border-soft);
+  margin-bottom: 32px;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--ai-text);
+}
+
+/* Основной блок — карточка загрузки по центру */
+.main-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0 8px;
+}
+
+/* Карточки */
+.card {
+  background: var(--ai-surface);
+  border: 1px solid var(--ai-border);
+  border-radius: var(--ai-radius);
+  padding: 28px;
+  margin-bottom: 24px;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+.card:hover {
+  border-color: var(--ai-border-strong);
+}
+
+.card-title {
+  display: block;
+  font-weight: 500;
+  color: var(--ai-text-3);
+  letter-spacing: 1px;
+}
+
+/* Кнопки — текст с линией снизу */
+button {
+  background: transparent;
+  color: var(--ai-text-3);
+  border: none;
+  border-bottom: 2px solid var(--ai-border-strong);
+  padding: 8px 6px 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  text-transform: lowercase;
+}
+button:hover:not(:disabled) {
+  color: var(--ai-text);
+  border-bottom-color: var(--ai-text);
+}
+button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Главное действие (analyze) — с акцентом портала */
+.btn-primary {
+  color: var(--ai-accent);
+  border-bottom-color: var(--ai-accent-soft);
+}
+.btn-primary:hover:not(:disabled) {
+  color: var(--ai-accent-hover);
+  border-bottom-color: var(--ai-accent-hover);
+}
+
+input[type='file'] {
+  display: none;
+}
+
+.muted {
+  color: var(--ai-muted);
+  font-size: 14px;
+}
+
+.row {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.error {
+  color: var(--ai-error);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------------
+   Индикатор текущей модели — компактная строка слева.
+   --------------------------------------------------------------------- */
+.model-indicator {
+  font-size: 13px;
+  color: var(--ai-muted);
+  letter-spacing: 0.5px;
+}
+.model-indicator-value {
+  color: var(--ai-text);
+}
+
+/* ---------------------------------------------------------------------
+   Карточка загрузки файла со стрелками переключения модели на середине
+   левой/правой границы.
+   --------------------------------------------------------------------- */
+.upload-card {
+  position: relative;
+  max-width: 700px;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+.upload-card.drag-over {
+  border-color: var(--ai-accent-soft);
+  background: var(--ai-surface-hover);
+}
+
+.upload-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  padding: 8px 40px;
+  border-radius: var(--ai-radius-sm);
+}
+.upload-drop:hover .upload-icon {
+  color: var(--ai-accent);
+  transform: translateY(-2px);
+}
+
+.upload-icon {
+  width: 46px;
+  height: 46px;
+  color: var(--ai-muted);
+  transition: color 0.2s, transform 0.2s;
+  pointer-events: none; /* клик обрабатывает .upload-drop */
+}
+
+.upload-hint {
+  word-break: break-all;
+  text-align: center;
+}
+.upload-limit {
+  font-size: 12px;
+  margin-top: -10px;
+}
+
+.upload-actions {
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.model-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--ai-border-strong);
+  background: var(--ai-surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--ai-muted);
+}
+.model-arrow:hover:not(:disabled) {
+  color: var(--ai-accent);
+  border-color: var(--ai-accent-soft);
+  background: var(--ai-surface-hover);
+}
+.model-arrow-left {
+  left: -17px;
+}
+.model-arrow-right {
+  right: -17px;
+}
+.model-arrow-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------------------------------------------------------------------
+   Диаграмма амплитуды (waveform). Единственное место, где сознательно
+   используется полноцветная шкала "холодный → тёплый".
+   --------------------------------------------------------------------- */
+.waveform-wrap {
+  position: relative;
+}
+
+.waveform-canvas {
+  width: 100%;
+  height: 150px;
+  display: block;
+  margin-top: 10px;
+}
+
+/* Направляющие линии от границ чанков вверх, только в область графика
+   (160px = высота canvas + его отступ сверху). Базовая сетка — сплошная,
+   сетка со сдвигом +1s — пунктирная. */
+.waveform-guide-line {
+  position: absolute;
+  top: 0;
+  height: 160px;
+  width: 1px;
+  pointer-events: none;
+}
+.waveform-guide-line-base {
+  background: rgba(255, 255, 255, 0.1);
+}
+.waveform-guide-line-offset {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.22) 0px,
+    rgba(255, 255, 255, 0.22) 3px,
+    rgba(255, 255, 255, 0) 3px,
+    rgba(255, 255, 255, 0) 7px
+  );
+}
+
+/* ---------------------------------------------------------------------
+   Ряды чанков — прямо под диаграммой, как единая сетка по времени.
+   --------------------------------------------------------------------- */
+.chunk-row-tag {
+  display: block;
+  font-size: 10px;
+  color: var(--ai-muted);
+  letter-spacing: 0.5px;
+  margin-top: 10px;
+  margin-bottom: 3px;
+}
+
+.chunk-row {
+  position: relative;
+  height: 52px;
+}
+
+.chunk-box {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--ai-surface-2);
+  border: 1px solid var(--ai-border-soft);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ai-text-3);
+  overflow: hidden;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.chunk-box:hover {
+  border-color: var(--ai-border-hover);
+  color: var(--ai-text);
+}
+/* Звучит сейчас */
+.chunk-box.active {
+  background: var(--ai-surface-hover);
+  border-color: var(--ai-accent);
+  color: var(--ai-text);
+}
+/* Выбран (открыта карточка подробностей) — акцентная линия снизу, как у
+   кнопок, чтобы не путать с подсветкой воспроизведения */
+.chunk-box.selected {
+  color: var(--ai-text);
+  box-shadow: inset 0 -2px 0 var(--ai-accent);
+}
+.chunk-box.has-error {
+  opacity: 0.4;
+}
+.chunk-box-category {
+  font-weight: 500;
+}
+.chunk-box-count {
+  font-weight: 400;
+  opacity: 0.6;
+}
+.chunk-box-target {
+  font-size: 9px;
+  opacity: 0.75;
+}
+.chunk-box-error {
+  color: var(--ai-error);
+  font-size: 8px;
+}
+
+/* ---------------------------------------------------------------------
+   Карточка подробностей о чанке. Кнопки действий (play / wav / закрыть) —
+   в правом верхнем углу. Самый вероятный класс выделен акцентом.
+   --------------------------------------------------------------------- */
+.chunk-details {
+  position: relative;
+}
+
+.chunk-details-actions {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.chunk-details-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.chunk-details-close {
+  border-bottom: none;
+  padding: 6px;
+  color: var(--ai-muted);
+}
+.chunk-details-icon {
+  width: 14px;
+  height: 14px;
+}
+.chunk-details-icon-fill {
+  fill: currentColor;
+}
+
+.chunk-details-time {
+  font-size: 13px;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chunk-details-siblings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+.chunk-details-sibling {
+  font-size: 13px;
+  padding: 2px 4px;
+}
+.chunk-details-sibling.current {
+  color: var(--ai-accent);
+  border-bottom-color: var(--ai-accent);
+}
+
+.chunk-details-error {
+  margin-top: 16px;
+  word-break: break-word;
+}
+
+.chunk-details-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  margin-top: 22px;
+}
+.chunk-details-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.chunk-details-fact .muted {
+  font-size: 13px;
+}
+.chunk-details-fact-value {
+  font-size: 22px;
+  color: var(--ai-text);
+  letter-spacing: 1px;
+}
+.chunk-details-fact-pct {
+  font-size: 15px;
+  color: var(--ai-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.chunk-details-dists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-top: 22px;
+}
+.chunk-dist-title {
+  font-size: 11px;
+  color: var(--ai-muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.chunk-dist-row {
+  display: grid;
+  grid-template-columns: 116px 1fr 56px 46px;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ai-muted);
+  line-height: 1.9;
+}
+.chunk-dist-row.top {
+  color: var(--ai-text);
+}
+.chunk-dist-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chunk-dist-bar {
+  position: relative;
+  height: 4px;
+  background: var(--ai-border-soft);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.chunk-dist-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--ai-border-hover);
+  border-radius: 2px;
+}
+.chunk-dist-row.top .chunk-dist-bar-fill {
+  background: var(--ai-accent);
+}
+.chunk-dist-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.chunk-dist-logit {
+  text-align: right;
+  font-size: 11px;
+  color: var(--ai-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.chunk-details-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ai-border-soft);
+  font-size: 12px;
+}
+.chunk-details-meta span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Отладочный блок с ответами сервера */
+.debug-log {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ai-muted);
+  max-height: 300px;
+  overflow: auto;
+  margin-top: 12px;
+  background: var(--ai-bg);
+  padding: 16px;
+  border: 1px solid var(--ai-border-soft);
+  border-radius: var(--ai-radius-sm);
+}
+
+/* ---------------------------------------------------------------------
+   Плеер. position: sticky — прилипает к низу экрана, пока виден блок
+   инференса, и не перекрывает подвал портала (fixed перекрывал бы).
+   --------------------------------------------------------------------- */
+.player-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+  margin-top: 8px;
+  background: rgba(16, 15, 13, 0.97);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--ai-border);
+  border-radius: var(--ai-radius);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+  animation: playerSlideUp 0.3s ease;
+}
+
+@keyframes playerSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.player-bar-inner {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.player-play-btn {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--ai-accent-soft);
+  background: var(--ai-accent-ring);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+.player-play-btn:hover:not(:disabled) {
+  background: var(--ai-accent);
+  border-color: var(--ai-accent);
+  transform: scale(1.05);
+}
+.player-play-btn:hover .player-icon {
+  fill: var(--accent-ink, #071c19);
+}
+
+.player-icon {
+  width: 18px;
+  height: 18px;
+  fill: var(--ai-accent);
+  stroke: none;
+}
+.player-icon-small {
+  width: 14px;
+  height: 14px;
+  fill: none;
+}
+
+.player-track-info {
+  flex-shrink: 0;
+  min-width: 120px;
+  max-width: 220px;
+}
+.player-track-name {
+  font-size: 14px;
+  color: var(--ai-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-track-model {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.player-time {
+  font-size: 12px;
+  color: var(--ai-muted);
+  flex-shrink: 0;
+  min-width: 64px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-progress {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  background: var(--ai-border);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.player-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--ai-accent);
+  border-radius: 2px;
+}
+.player-progress-thumb {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ai-accent);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 4px var(--ai-accent-ring);
+}
+
+.player-close-btn {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--ai-muted);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.player-close-btn:hover:not(:disabled) {
+  color: var(--ai-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Телефоны */
+@media (max-width: 600px) {
+  .card {
+    padding: 22px 18px;
+  }
+  .row {
+    gap: 12px;
+  }
+  h1 {
+    font-size: 20px;
+  }
+  .upload-icon {
+    width: 38px;
+    height: 38px;
+  }
+  .upload-drop {
+    padding: 8px 34px;
+  }
+  .model-arrow {
+    width: 30px;
+    height: 30px;
+  }
+  .model-arrow-left {
+    left: -13px;
+  }
+  .model-arrow-right {
+    right: -13px;
+  }
+  .chunk-box {
+    font-size: 9px;
+  }
+
+  .chunk-details-actions {
+    position: static;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+  }
+  .chunk-details-dists {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .chunk-details-summary {
+    gap: 18px;
+  }
+  .chunk-dist-row {
+    grid-template-columns: 96px 1fr 52px 40px;
+    gap: 8px;
+  }
+
+  .player-bar-inner {
+    padding: 10px 14px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .player-track-info {
+    order: 1;
+    min-width: 0;
+    max-width: 60%;
+  }
+  .player-play-btn {
+    order: 0;
+  }
+  .player-close-btn {
+    order: 2;
+    margin-left: auto;
+  }
+  .player-progress {
+    order: 4;
+    flex-basis: 100%;
+    margin-top: 4px;
+  }
+  .player-time {
+    order: 3;
+    min-width: 56px;
+  }
+}

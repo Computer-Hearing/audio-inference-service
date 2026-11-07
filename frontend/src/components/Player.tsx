@@ -1,10 +1,11 @@
-// src/components/Player.jsx
+// src/components/Player.tsx
 // Плеер, закреплённый внизу страницы (по аналогии с музыкальными сервисами:
-// Spotify / Apple Music / Yandex Music). Появляется, когда в Main.jsx выбран
-// файл, и остаётся видимым независимо от прокрутки страницы.
-import { useRef } from 'react';
+// Spotify / Apple Music / Yandex Music). Появляется, когда в App.tsx выбран
+// файл, и прилипает к низу экрана, пока виден блок инференса (position: sticky —
+// fixed внутри портала перекрывал бы его подвал).
+import { useRef, type MouseEvent } from 'react';
 
-function formatTime(sec) {
+function formatTime(sec: number): string {
   if (!isFinite(sec) || sec < 0) sec = 0;
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -44,6 +45,17 @@ function CloseIcon() {
   );
 }
 
+interface PlayerProps {
+  fileName?: string;
+  modelLabel?: string;
+  playing: boolean;
+  currentTime: number;
+  duration: number;
+  onPlayPause: () => void;
+  onSeek: (t: number) => void;
+  onClose: () => void;
+}
+
 export default function Player({
   fileName,
   modelLabel,
@@ -53,12 +65,12 @@ export default function Player({
   onPlayPause,
   onSeek,
   onClose,
-}) {
-  const trackRef = useRef(null);
+}: PlayerProps) {
+  const trackRef = useRef<HTMLDivElement>(null);
 
   const pct = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
 
-  const seekFromEvent = (e) => {
+  const seekFromEvent = (e: MouseEvent<HTMLDivElement>) => {
     const el = trackRef.current;
     if (!el || !duration) return;
     const rect = el.getBoundingClientRect();

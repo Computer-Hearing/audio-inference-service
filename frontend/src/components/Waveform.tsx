@@ -1,8 +1,8 @@
-// src/components/Waveform.jsx
+// src/components/Waveform.tsx
 //
 // Диаграмма громкости во времени (RMS-амплитуда). Раньше массив waves
 // приходил с бэкенда в ответе CreateTask, теперь он строится на фронтенде
-// из самого файла — см. src/audio.js.
+// из самого файла — см. src/audio.ts.
 //
 // Столбцы привязаны к secondsPerChunk модели: границы столбцов совпадают
 // с границами чанков (и базового слоя, и слоя со сдвигом +1s), поэтому
@@ -10,15 +10,29 @@
 // границ чанков вверх, в область графика, ложатся ровно в щели между
 // столбцами.
 //
-// Плашки чанков кликабельны: клик выбирает чанк, и Main.jsx показывает
-// под диаграммой карточку с подробностями о нём (ChunkDetails.jsx).
+// Плашки чанков кликабельны: клик выбирает чанк, и App.tsx показывает
+// под диаграммой карточку с подробностями о нём (ChunkDetails.tsx).
 import { useEffect, useMemo, useRef } from 'react';
-import { computeBars } from '../audio.js';
-import { labelsFor, argmaxIndex, chunkKey, chunkRange } from '../chunks.js';
+import { computeBars, type AudioData } from '../audio.ts';
+import { labelsFor, argmaxIndex, chunkKey, chunkRange, type Range } from '../chunks.ts';
+import type { Chunk } from '../gen/inference/v1/inference_pb.ts';
+
+type Rgb = [number, number, number];
+
+interface Group {
+  start: number;
+  end: number;
+  catIdx: number;
+  tgtIdx: number;
+  error: boolean;
+  errorMessage: string;
+  count: number;
+  items: Chunk[];
+}
 
 // Цветовая карта амплитуды: тихо (тёмно-синий) → громко (красный),
 // стандартная для аудио-визуализаторов логика "холодный → тёплый".
-const COLOR_STOPS = [
+const COLOR_STOPS: { t: number; c: Rgb }[] = [
   { t: 0.0, c: [10, 14, 30] },
   { t: 0.16, c: [32, 64, 128] },
   { t: 0.36, c: [22, 138, 148] },
@@ -28,7 +42,7 @@ const COLOR_STOPS = [
   { t: 1.0, c: [230, 48, 56] },
 ];
 
-function colormap(t) {
+function colormap(t: number): Rgb {
   t = Math.min(1, Math.max(0, t || 0));
   for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
     const a = COLOR_STOPS[i];
@@ -45,7 +59,7 @@ function colormap(t) {
   return COLOR_STOPS[COLOR_STOPS.length - 1].c;
 }
 
-function rgb([r, g, b], factor = 1) {
+function rgb([r, g, b]: Rgb, factor = 1): string {
   if (factor >= 1) {
     const f = factor - 1;
     return `rgb(${r + (255 - r) * f}, ${g + (255 - g) * f}, ${b + (255 - b) * f})`;
@@ -58,8 +72,8 @@ function rgb([r, g, b], factor = 1) {
 // выдаёт одно и то же, незачем рисовать это как несколько одинаковых
 // табличек подряд. Ошибочные чанки друг с другом не схлопываются — каждый
 // остаётся отдельным блоком, чтобы не потерять, где именно была ошибка.
-function mergeGroups(ranges, chunksArr) {
-  const groups = [];
+function mergeGroups(ranges: Range[], chunksArr: Chunk[]): Group[] {
+  const groups: Group[] = [];
   chunksArr.forEach((ch, i) => {
     const { start, end } = ranges[i];
     const catIdx = argmaxIndex(ch.category);
@@ -86,6 +100,17 @@ function mergeGroups(ranges, chunksArr) {
   return groups;
 }
 
+interface WaveformProps {
+  audioData: AudioData | null;
+  chunks: Chunk[] | null;
+  duration: number;
+  currentTime: number;
+  chunkSeconds: number;
+  modelName: string;
+  selectedKey?: string;
+  onSelectChunk: (items: Chunk[]) => void;
+}
+
 export default function Waveform({
   audioData,
   chunks,
@@ -95,8 +120,8 @@ export default function Waveform({
   modelName,
   selectedKey,
   onSelectChunk,
-}) {
-  const canvasRef = useRef(null);
+}: WaveformProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Длительность берём из декодированного файла — по ней же считаются
   // столбцы, так что столбцы и чанки размечаются в одной шкале времени.
@@ -135,6 +160,7 @@ export default function Waveform({
     const cv = canvasRef.current;
     if (!cv) return;
     const ctx = cv.getContext('2d');
+    if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
     const W = cv.clientWidth;
     const H = cv.clientHeight;
@@ -168,7 +194,7 @@ export default function Waveform({
     }
   }, [bars, duration]);
 
-  const renderChunkRow = (groups, extraClass) => (
+  const renderChunkRow = (groups: Group[], extraClass: string) => (
     <div className={`chunk-row ${extraClass}`}>
       {groups.map((g, i) => {
         if (!duration) return null;
@@ -241,13 +267,12 @@ export default function Waveform({
 
   return (
     <div className="card">
-      <strong style={{ color: '#aaa', letterSpacing: 1 }}>waveform</strong>
+      <strong className="card-title">waveform</strong>
 
       <div className="waveform-wrap">
         <canvas
           ref={canvasRef}
           className="waveform-canvas"
-          style={{ width: '100%', height: 150, display: 'block', marginTop: 10 }}
         />
 
         {baseChunks.length > 0 && (

@@ -1,11 +1,40 @@
+# inference.kuronami.fun
+#
+#   /inference.js                           -> фронтенд инференса одним файлом
+#                                              (собирается в Caddy.Dockerfile),
+#                                              его загружает портал
+#   /inference.v1.api.InferenceService/*    -> API, бэкенд
 :80 {
+    encode zstd gzip
+
+    # Портал открыт на другом домене (www.kuronami.fun), поэтому браузеру
+    # нужно явное разрешение (CORS) и на загрузку inference.js как модуля,
+    # и на запросы к API. Сервис анонимный (без cookie), поэтому "*" безопасен;
+    # при желании можно сузить до адреса портала через CORS_ALLOW_ORIGIN.
+    header {
+        Access-Control-Allow-Origin "{$CORS_ALLOW_ORIGIN:*}"
+        Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Connect-Protocol-Version, Connect-Timeout-Ms"
+        Access-Control-Max-Age "86400"
+        X-Content-Type-Options "nosniff"
+    }
+
+    # Предварительный запрос браузера перед POST к API ("можно ли?")
+    @preflight method OPTIONS
+    handle @preflight {
+        respond 204
+    }
+
     handle /inference.v1.api.InferenceService/* {
         reverse_proxy backend:6767
     }
 
     handle {
         root * /srv
-        try_files {path} /index.html
+        # Имя файла постоянное (inference.js), поэтому браузер каждый раз
+        # сверяется с сервером: без изменений придёт короткий ответ 304,
+        # после выкладки новой версии — сразу новый файл
+        header Cache-Control "no-cache"
         file_server
     }
 }

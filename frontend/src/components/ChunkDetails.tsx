@@ -1,11 +1,12 @@
-// src/components/ChunkDetails.jsx
+// src/components/ChunkDetails.tsx
 //
 // Карточка с подробностями о выбранном чанке: открывается по клику на
-// плашку чанка под гистограммой (Waveform.jsx) и показывает всё, что
+// плашку чанка под гистограммой (Waveform.tsx) и показывает всё, что
 // известно о чанке, — слой, номер, время, ответ модели и полное
 // распределение вероятностей по всем классам. В правом верхнем углу —
 // кнопки: прослушать фрагмент, скачать его в WAV и закрыть карточку.
 import { useEffect, useRef, useState } from 'react';
+import type { Chunk } from '../gen/inference/v1/inference_pb.ts';
 import {
   labelsFor,
   argmaxIndex,
@@ -13,13 +14,13 @@ import {
   chunkRange,
   layerLabel,
   softmax,
-} from '../chunks.js';
+} from '../chunks.ts';
 
-function formatSec(sec) {
+function formatSec(sec: number): string {
   return `${sec.toFixed(3)} s`;
 }
 
-function formatPct(p) {
+function formatPct(p: number): string {
   return `${(p * 100).toFixed(1)}%`;
 }
 
@@ -67,7 +68,15 @@ function CloseIcon() {
 // Распределение вероятностей по классам: строки отсортированы по убыванию,
 // у каждой — название, полоска, процент и "сырое" значение (логит),
 // которое прислал бэкенд.
-function Distribution({ title, labels, logits }) {
+function Distribution({
+  title,
+  labels,
+  logits,
+}: {
+  title: string;
+  labels: string[];
+  logits: number[];
+}) {
   const probs = softmax(logits);
   const rows = probs
     .map((p, i) => ({ label: labels[i] || `class ${i}`, p, logit: logits[i] }))
@@ -92,6 +101,19 @@ function Distribution({ title, labels, logits }) {
   );
 }
 
+interface ChunkDetailsProps {
+  chunk: Chunk;
+  siblings: Chunk[];
+  chunkSeconds: number;
+  duration: number;
+  fileName?: string;
+  modelName: string;
+  onSelect: (chunk: Chunk) => void;
+  onClose: () => void;
+  onPlay: (start: number, end: number) => void;
+  onDownload: (chunk: Chunk, start: number, end: number) => Promise<void>;
+}
+
 export default function ChunkDetails({
   chunk,
   siblings,
@@ -103,10 +125,10 @@ export default function ChunkDetails({
   onClose,
   onPlay,
   onDownload,
-}) {
-  const rootRef = useRef(null);
+}: ChunkDetailsProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const offset = chunk.offset || 0;
   const { start, end } = chunkRange(offset, chunk.chunkIndex, chunkSeconds, duration);
@@ -126,7 +148,7 @@ export default function ChunkDetails({
 
   // Закрытие по Esc
   useEffect(() => {
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
@@ -146,7 +168,7 @@ export default function ChunkDetails({
     try {
       await onDownload(chunk, start, end);
     } catch (e) {
-      setDownloadError(e.message || 'download failed');
+      setDownloadError(e instanceof Error ? e.message : 'download failed');
     } finally {
       setDownloading(false);
     }
@@ -186,7 +208,7 @@ export default function ChunkDetails({
         </button>
       </div>
 
-      <strong style={{ color: '#aaa', letterSpacing: 1 }}>
+      <strong className="card-title">
         chunk {layerLabel(offset)} #{chunk.chunkIndex}
       </strong>
       <div className="chunk-details-time muted">
