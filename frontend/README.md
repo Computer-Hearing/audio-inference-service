@@ -60,23 +60,20 @@ npm run preview      # раздаёт dist/inference.js на http://localhost:80
 
 ## Развёртывание
 
-```bash
-docker compose up -d --build     # из папки frontend/
-```
+Отдельного развёртывания у фронтенда нет: его собирает и раздаёт Caddy
+основного стека инференса (`deployments/`).
 
-- `Dockerfile` — двухступенчатая сборка: `node` собирает `inference.js`,
-  в итоговый образ `caddy` попадают только он и `Caddyfile`.
-- `Caddyfile` — раздаёт `inference.js` (с CORS, чтобы портал на другом
-  домене мог его загрузить) и проксирует API
-  `/inference.v1.api.InferenceService/*` в основной стек инференса.
-- `docker-compose.yaml` — один сервис `inference_frontend` в общей сети
-  `computer-hearing`.
+- `deployments/dockerfiles/Caddy.Dockerfile` — двухступенчатая сборка:
+  `node` собирает `inference.js` (`npm ci && npm run build`), в итоговый
+  образ `caddy` попадают только он и `Caddyfile`.
+- `deployments/caddy/Caddyfile` — раздаёт `inference.js` (с CORS, чтобы
+  портал на другом домене мог его загрузить) и проксирует API
+  `/inference.v1.api.InferenceService/*` в бэкенд.
 
-Переменные окружения контейнера:
+Переменная окружения контейнера `inference_caddy`:
 
 | Переменная | По умолчанию | Что делает |
 | --- | --- | --- |
-| `INFERENCE_API_UPSTREAM` | `inference_caddy:80` | куда проксировать API |
 | `CORS_ALLOW_ORIGIN` | `*` | какому сайту можно загружать модуль и ходить в API |
 
 ## Структура

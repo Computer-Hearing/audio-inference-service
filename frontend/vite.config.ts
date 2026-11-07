@@ -7,7 +7,7 @@
 //
 //  npm run build — сборка "библиотеки": один файл dist/inference.js со всем
 //                  кодом, React и стилями внутри. Его раздаёт Caddy
-//                  (см. Dockerfile), а портал загружает по адресу
+//                  (deployments/dockerfiles/Caddy.Dockerfile), а портал загружает по адресу
 //                  https://inference.kuronami.fun/inference.js и вызывает mount().
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
