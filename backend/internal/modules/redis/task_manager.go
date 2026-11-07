@@ -404,7 +404,7 @@ func (m *TaskManager) Read(
 }
 
 // Reclaim забирает сообщения, которые не были подтверждены дольше minIdle.
-// Это замена переотправке зависших processing-задач.
+// Переотправка зависших processing-задач.
 func (m *TaskManager) Reclaim(
 	ctx context.Context, minIdle time.Duration, count int) ([]domain.TaskDelivery, error) {
 

@@ -146,7 +146,7 @@ func processDelivery(ctx context.Context, opts Options, delivery domain.TaskDeli
 		return
 	}
 
-	logger.Debug("process task")
+	logger.Debug("process task", "task_id", delivery.TaskID)
 	if err := opts.Predictor.ProcessTask(ctx, domain.TaskPayload{
 		TaskID:  delivery.TaskID,
 		Payload: *payload,
