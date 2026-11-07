@@ -191,10 +191,10 @@ func (m *TaskManager) CreateTask(
 		return pkg.NewBadRequestWithDetails("create task validation failed", details)
 	}
 
-	chunksJSON, err := json.Marshal(payload.Chunks)
+	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		return pkg.NewInternalWithDetails(
-			"marshal audio chunks failed",
+			"marshal audio payload failed",
 			map[string]string{"error": err.Error()},
 		)
 	}
@@ -206,7 +206,7 @@ func (m *TaskManager) CreateTask(
 			fieldAttempts, 0,
 		)
 		pipe.Expire(ctx, stateKey(taskID), m.ttl)
-		pipe.Set(ctx, payloadKey(taskID), chunksJSON, m.ttl)
+		pipe.Set(ctx, payloadKey(taskID), payloadJSON, m.ttl)
 		pipe.XAdd(ctx, &goredis.XAddArgs{
 			Stream: m.stream,
 			MaxLen: streamMaxLen,
@@ -247,6 +247,10 @@ func (m *TaskManager) GetPayload(
 			"failed to unmarshal task payload",
 			map[string]string{"taskID": string(taskID), "error": err.Error()},
 		)
+	}
+	if payload.ModelName == "" {
+		// Битый или устаревший payload: воркер не должен ретраить его вечно.
+		return nil, false, nil
 	}
 
 	return &payload, true, nil
