@@ -1,4 +1,4 @@
-// src/audio.js
+// src/audio.ts
 //
 // Гистограмма громкости теперь строится на фронтенде: CreateTask больше не
 // возвращает waves. Файл декодируется прямо в браузере (Web Audio API),
@@ -20,13 +20,33 @@ const TARGET_BARS = 160;
 // получается "гребёнка" без смысла.
 const MAX_BARS_PER_SECOND = 10;
 
+// Декодированный файл в облегчённом виде (моно, 22050 Гц) — для гистограммы
+export interface AudioData {
+  samples: Float32Array;
+  sampleRate: number;
+  duration: number;
+}
+
+export interface Bar {
+  start: number;
+  end: number;
+  value: number;
+}
+
+// Safari до 14.1 знал OfflineAudioContext только с приставкой webkit
+function offlineContext(sampleRate: number): OfflineAudioContext {
+  const Ctx =
+    window.OfflineAudioContext ||
+    (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext })
+      .webkitOfflineAudioContext;
+  return new Ctx(1, 1, sampleRate);
+}
+
 /**
  * Декодирует аудиофайл и сводит все каналы в моно.
- * @returns {Promise<{ samples: Float32Array, sampleRate: number, duration: number }>}
  */
-export async function decodeAudio(file) {
-  const AudioCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  const ctx = new AudioCtx(1, 1, DECODE_SAMPLE_RATE);
+export async function decodeAudio(file: File): Promise<AudioData> {
+  const ctx = offlineContext(DECODE_SAMPLE_RATE);
   const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
 
   const channels = buffer.numberOfChannels;
@@ -53,7 +73,7 @@ export async function decodeAudio(file) {
  * чанков: стыковка остаётся с базовым слоем, слой +1s на таком масштабе
  * всё равно не читается.
  */
-export function barSecondsFor(duration, chunkSeconds) {
+export function barSecondsFor(duration: number, chunkSeconds: number): number {
   if (!(duration > 0) || !(chunkSeconds > 0)) return chunkSeconds || 1;
 
   if (duration <= TARGET_BARS) {
@@ -69,14 +89,16 @@ export function barSecondsFor(duration, chunkSeconds) {
 /**
  * Разбивает файл на столбцы и считает RMS-амплитуду каждого.
  * Последний столбец может быть короче — как и последний чанк.
- * @returns {{ start: number, end: number, value: number }[]}
  */
-export function computeBars({ samples, sampleRate, duration }, chunkSeconds) {
+export function computeBars(
+  { samples, sampleRate, duration }: AudioData,
+  chunkSeconds: number,
+): Bar[] {
   if (!samples || !samples.length || !(duration > 0)) return [];
 
   const barSeconds = barSecondsFor(duration, chunkSeconds);
   const count = Math.ceil(duration / barSeconds - 1e-9);
-  const bars = [];
+  const bars: Bar[] = [];
 
   for (let i = 0; i < count; i++) {
     const start = i * barSeconds;
@@ -109,20 +131,17 @@ const EXPORT_SAMPLE_RATE = 44100;
 
 /**
  * Декодирует файл в полном качестве (каналы сохраняются).
- * @returns {Promise<AudioBuffer>}
  */
-export async function decodeAudioFull(file) {
-  const AudioCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  const ctx = new AudioCtx(1, 1, EXPORT_SAMPLE_RATE);
+export async function decodeAudioFull(file: File): Promise<AudioBuffer> {
+  const ctx = offlineContext(EXPORT_SAMPLE_RATE);
   return ctx.decodeAudioData(await file.arrayBuffer());
 }
 
 /**
  * Вырезает из AudioBuffer отрезок [start, end) секунд и упаковывает его
  * в WAV (16 бит PCM, все каналы).
- * @returns {Blob}
  */
-export function encodeWavSegment(buffer, start, end) {
+export function encodeWavSegment(buffer: AudioBuffer, start: number, end: number): Blob {
   const sampleRate = buffer.sampleRate;
   const channels = buffer.numberOfChannels;
   const from = Math.max(0, Math.min(buffer.length, Math.round(start * sampleRate)));
@@ -133,7 +152,7 @@ export function encodeWavSegment(buffer, start, end) {
   const dataSize = frames * channels * bytesPerSample;
   const view = new DataView(new ArrayBuffer(44 + dataSize));
 
-  const writeString = (offset, s) => {
+  const writeString = (offset: number, s: string) => {
     for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
   };
 
@@ -154,7 +173,7 @@ export function encodeWavSegment(buffer, start, end) {
 
   // Сами отсчёты: каналы чередуются (Л, П, Л, П, ...), дробное число
   // от -1 до 1 переводится в целое 16-битное от -32768 до 32767
-  const data = [];
+  const data: Float32Array[] = [];
   for (let c = 0; c < channels; c++) data.push(buffer.getChannelData(c));
   let offset = 44;
   for (let i = from; i < to; i++) {
@@ -171,7 +190,7 @@ export function encodeWavSegment(buffer, start, end) {
 /**
  * Отдаёт Blob пользователю как скачиваемый файл.
  */
-export function saveBlob(blob, fileName) {
+export function saveBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

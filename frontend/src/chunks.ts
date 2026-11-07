@@ -1,14 +1,17 @@
-// src/chunks.js
+// src/chunks.ts
 //
 // Общие сведения о чанках, которые нужны и рядам чанков под гистограммой
-// (Waveform.jsx), и карточке с подробностями о чанке (ChunkDetails.jsx).
+// (Waveform.tsx), и карточке с подробностями о чанке (ChunkDetails.tsx).
+import type { Chunk } from './gen/inference/v1/inference_pb.ts';
 
 // Подписи классов по проекту — это префикс имени модели до первого "_":
 //   road_rnn_99k_09915acc_1           -> road
 //   traffic_mobilenet_1_0922combf1m_2 -> traffic
 // У road только target_output, у traffic — category_output и target_output.
 // Если проект не найден — показываем "class N", чтобы UI не ломался.
-const PROJECT_LABELS = {
+export type LabelKind = 'category' | 'target';
+
+const PROJECT_LABELS: Record<string, Partial<Record<LabelKind, string[]>>> = {
   road: {
     target: ['dry_asphalt', 'snow', 'wet_asphalt'],
   },
@@ -18,17 +21,18 @@ const PROJECT_LABELS = {
   },
 };
 
-function projectOf(modelName) {
+function projectOf(modelName: string | undefined): string | undefined {
   return modelName?.split('_')[0];
 }
 
-export function labelsFor(modelName, kind, count) {
-  const labels = PROJECT_LABELS[projectOf(modelName)]?.[kind];
+export function labelsFor(modelName: string | undefined, kind: LabelKind, count: number): string[] {
+  const project = projectOf(modelName);
+  const labels = project ? PROJECT_LABELS[project]?.[kind] : undefined;
   if (labels) return labels;
   return Array.from({ length: count || 0 }, (_, i) => `class ${i}`);
 }
 
-export function argmaxIndex(arr) {
+export function argmaxIndex(arr: readonly number[] | undefined): number {
   if (!arr || !arr.length) return -1;
   let best = 0;
   for (let i = 1; i < arr.length; i++) if (arr[i] > arr[best]) best = i;
@@ -40,7 +44,7 @@ export function argmaxIndex(arr) {
 // последнего линейного слоя нет Softmax. Чтобы показать проценты, переводим
 // логиты в вероятности сами. Вычитание максимума — стандартный приём,
 // чтобы exp() не переполнялся на больших значениях; на результат не влияет.
-export function softmax(arr) {
+export function softmax(arr: readonly number[] | undefined): number[] {
   if (!arr || !arr.length) return [];
   const max = Math.max(...arr);
   const exps = arr.map((v) => Math.exp(v - max));
@@ -58,17 +62,27 @@ export function softmax(arr) {
 //    считаются от отметки offset, хвост НЕ создаётся.
 // Опираемся на chunkIndex и offset, которые уже возвращает бэкенд.
 // -----------------------------------------------------------------------
-export function chunkRange(offset, chunkIndex, chunkSeconds, duration) {
+export interface Range {
+  start: number;
+  end: number;
+}
+
+export function chunkRange(
+  offset: number,
+  chunkIndex: number,
+  chunkSeconds: number,
+  duration: number,
+): Range {
   const start = offset + chunkIndex * chunkSeconds;
   const end = Math.min(duration, start + chunkSeconds);
   return { start, end: Math.max(start, end) };
 }
 
 // Уникальный ключ чанка: номер сам по себе повторяется в каждом слое.
-export function chunkKey(ch) {
+export function chunkKey(ch: Pick<Chunk, 'offset' | 'chunkIndex'>): string {
   return `${ch.offset || 0}:${ch.chunkIndex}`;
 }
 
-export function layerLabel(offset) {
+export function layerLabel(offset: number): string {
   return offset ? `+${offset}s` : 'base';
 }

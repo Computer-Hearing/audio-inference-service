@@ -1,21 +1,55 @@
-// src/components/Main.jsx
-import { useCallback, useEffect, useRef, useState } from 'react';
+// src/App.tsx
+//
+// Главный экран инференса: выбор модели, загрузка файла, анализ, гистограмма
+// с рядами чанков, карточка чанка и плеер. Ничего не знает о том, где он
+// показан — на странице разработки (src/dev.tsx) или внутри портала
+// (src/index.tsx, функция mount): клиент API и настройки приходят снаружи.
 import {
-  getModels,
-  createTask,
-  pollTask,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from 'react';
+import {
   modelId,
   modelLabel,
   modelChunkSeconds,
   MAX_AUDIO_BYTES,
-} from '../api.js';
-import { decodeAudio, decodeAudioFull, encodeWavSegment, saveBlob } from '../audio.js';
-import { chunkKey } from '../chunks.js';
-import Waveform from './Waveform.jsx';
-import ChunkDetails from './ChunkDetails.jsx';
-import Player from './Player.jsx';
+  type InferenceApi,
+  type RawLogEntry,
+} from './api.ts';
+import {
+  decodeAudio,
+  decodeAudioFull,
+  encodeWavSegment,
+  saveBlob,
+  type AudioData,
+} from './audio.ts';
+import { chunkKey } from './chunks.ts';
+import type { Chunk, Model } from './gen/inference/v1/inference_pb.ts';
+import Waveform from './components/Waveform.tsx';
+import ChunkDetails from './components/ChunkDetails.tsx';
+import Player from './components/Player.tsx';
 
-function truncateName(name, max = 40) {
+type AnalyzeState = 'idle' | 'analyzing' | 'done' | 'error';
+
+// Выбранный чанк (по клику на плашку) и все чанки его блока — если
+// несколько одинаковых чанков подряд схлопнуты в одну плашку.
+interface Selection {
+  key: string;
+  items: Chunk[];
+}
+
+export interface AppProps {
+  api: InferenceApi;
+  // Своя шапка "audio inference". В портале заголовок раздела рисует сам
+  // портал, поэтому там она выключена.
+  header?: boolean;
+}
+
+function truncateName(name: string, max = 40): string {
   if (!name || name.length <= max) return name;
   const half = Math.floor((max - 1) / 2);
   return `${name.slice(0, half)}…${name.slice(name.length - half)}`;
@@ -25,7 +59,7 @@ function truncateName(name, max = 40) {
 // тематически про аудио, без лишней "сферической" декорации.
 // Имя скачиваемого фрагмента: <имя файла>_<слой>_chunk<номер>_<начало>-<конец>s.wav,
 // например street_base_chunk03_6.0-8.0s.wav
-function chunkFileName(sourceName, chunk, start, end) {
+function chunkFileName(sourceName: string, chunk: Chunk, start: number, end: number): string {
   const base = (sourceName || 'audio').replace(/\.[^.]+$/, '').replace(/[^\w\-]+/g, '_');
   const layer = chunk.offset ? `offset${chunk.offset}s` : 'base';
   const index = String(chunk.chunkIndex).padStart(2, '0');
@@ -52,7 +86,7 @@ function UploadIcon() {
   );
 }
 
-function ArrowIcon({ direction }) {
+function ArrowIcon({ direction }: { direction: 'left' | 'right' }) {
   const d = direction === 'left' ? 'M14 4l-8 8 8 8' : 'M10 4l8 8-8 8';
   return (
     <svg
@@ -70,65 +104,62 @@ function ArrowIcon({ direction }) {
   );
 }
 
-export default function Main() {
-  const [models, setModels] = useState([]);
+export default function App({ api, header = true }: AppProps) {
+  const [models, setModels] = useState<Model[]>([]);
   const [modelIndex, setModelIndex] = useState(0);
-  const [file, setFile] = useState(null);
+  const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const [state, setState] = useState('idle');
-  const [error, setError] = useState(null);
-  const [chunks, setChunks] = useState(null);
+  const [state, setState] = useState<AnalyzeState>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [chunks, setChunks] = useState<Chunk[] | null>(null);
   // Декодированный файл ({ samples, sampleRate, duration }) — из него
   // строится гистограмма громкости (раньше её присылал бэкенд как waves).
-  const [audioData, setAudioData] = useState(null);
+  const [audioData, setAudioData] = useState<AudioData | null>(null);
   // Модель, с которой реально был проанализирован текущий файл — от неё
   // зависит нарезка чанков и столбцов по времени (secondsPerChunk). Пользователь
   // может переключить модель для *следующего* анализа, не ломая
   // отображение уже готового результата.
-  const [analyzedModel, setAnalyzedModel] = useState(null);
-  // Выбранный чанк (по клику на плашку) и все чанки его блока — если
-  // несколько одинаковых чанков подряд схлопнуты в одну плашку.
-  // { key, items }, где key — chunkKey выбранного чанка.
-  const [selection, setSelection] = useState(null);
+  const [analyzedModel, setAnalyzedModel] = useState<Model | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
 
-  const [audioUrl, setAudioUrl] = useState(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
 
-  const [rawLog, setRawLog] = useState([]);
+  const [rawLog, setRawLog] = useState<RawLogEntry[]>([]);
 
-  const audioRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const rafRef = useRef(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const rafRef = useRef<number | null>(null);
   // Номер текущего файла — чтобы результат декодирования предыдущего
   // файла (если пользователь быстро выбрал другой) не перезаписал новый.
   const decodeIdRef = useRef(0);
   // Файл, декодированный в полном качестве для скачивания чанков:
   // { file, promise }. Декодируется один раз, при первом скачивании.
-  const fullAudioRef = useRef(null);
+  const fullAudioRef = useRef<{ file: File; promise: Promise<AudioBuffer> } | null>(null);
   // Конец фрагмента, который проигрывается кнопкой "play" в карточке чанка:
   // дойдя до него, воспроизведение останавливается.
-  const segmentEndRef = useRef(null);
+  const segmentEndRef = useRef<number | null>(null);
 
-  const handleRaw = (info) => setRawLog((prev) => [...prev, info]);
+  const handleRaw = (info: RawLogEntry) => setRawLog((prev) => [...prev, info]);
 
   useEffect(() => {
     // Список моделей — строго с бэкенда (GetModels), никаких заглушек:
     // если список пуст, значит Triton ещё не отдал ни одной модели
     // (см. models.Syncer на бэкенде) — это состояние явно показывается
     // пользователю, а не подменяется фейковыми названиями.
-    getModels()
-      .then((list) => {
-        setModels(list || []);
-        setModelIndex(0);
-      })
-      .catch(() => {
-        setModels([]);
-        setModelIndex(0);
-      });
-  }, []);
+    let cancelled = false;
+    api.getModels().then((list) => {
+      if (cancelled) return;
+      setModels(list);
+      setModelIndex(0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
 
   // Плавное обновление времени с точностью до миллисекунд во время
   // воспроизведения: событие 'timeupdate' у <audio> стреляет всего
@@ -160,12 +191,12 @@ export default function Main() {
   const currentModelLabel = modelLabel(currentModel) || 'no models available';
   const currentModelReady = !currentModel || currentModel.ready !== false;
 
-  const goToModel = (delta) => {
+  const goToModel = (delta: number) => {
     if (!models.length) return;
     setModelIndex((i) => (i + delta + models.length) % models.length);
   };
 
-  const processFile = (f) => {
+  const processFile = (f: File | null | undefined) => {
     if (!f) return;
     setFile(f);
     if (audioUrl) URL.revokeObjectURL(audioUrl);
@@ -199,13 +230,14 @@ export default function Main() {
     setState('analyzing');
     const modelUsed = currentModel;
     try {
-      const created = await createTask(file, currentModelId, handleRaw);
+      const created = await api.createTask(file, currentModelId, handleRaw);
       setAnalyzedModel(modelUsed);
 
-      const task = await pollTask(created.taskId, handleRaw);
+      const task = await api.pollTask(created.taskId, handleRaw);
       setChunks(task.result?.chunks || []);
       setState('done');
-    } catch (e) {
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
       setState('error');
       setError(
         e.message === 'timeout'
@@ -215,34 +247,34 @@ export default function Main() {
     }
   };
 
-  const handleFileChange = (e) => {
-    const f = e.target.files && e.target.files[0];
-    processFile(f);
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    processFile(e.target.files?.[0]);
+    // Сбрасываем значение, чтобы повторный выбор того же файла тоже срабатывал
+    e.target.value = '';
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(true);
   };
 
   const handleDragLeave = () => setDragOver(false);
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    processFile(f);
+    processFile(e.dataTransfer.files?.[0]);
   };
 
   const handlePlayPause = () => {
     const el = audioRef.current;
     if (!el) return;
     segmentEndRef.current = null;
-    if (el.paused) el.play();
+    if (el.paused) void el.play();
     else el.pause();
   };
 
-  const handleSeek = (t) => {
+  const handleSeek = (t: number) => {
     const el = audioRef.current;
     if (!el) return;
     segmentEndRef.current = null;
@@ -268,12 +300,12 @@ export default function Main() {
   };
 
   const triggerFileSelect = () => {
-    fileInputRef.current.click();
+    fileInputRef.current?.click();
   };
 
   // Клик по плашке: выбрать первый чанк блока; повторный клик по уже
   // выбранному блоку — закрыть карточку.
-  const handleSelectChunk = (items) => {
+  const handleSelectChunk = (items: Chunk[]) => {
     if (!items || !items.length) return;
     setSelection((prev) =>
       prev && items.some((ch) => chunkKey(ch) === prev.key)
@@ -285,23 +317,23 @@ export default function Main() {
   const handleCloseDetails = useCallback(() => setSelection(null), []);
 
   // Прослушать только выбранный фрагмент
-  const handlePlaySegment = (start, end) => {
+  const handlePlaySegment = (start: number, end: number) => {
     const el = audioRef.current;
     if (!el) return;
     el.currentTime = start;
     setCurrentTime(start);
     segmentEndRef.current = end;
-    el.play();
+    void el.play();
   };
 
   // Скачать фрагмент: файл декодируется в полном качестве (один раз на
   // файл), нужный отрезок вырезается и сохраняется в WAV.
-  const handleDownloadChunk = async (chunk, start, end) => {
+  const handleDownloadChunk = async (chunk: Chunk, start: number, end: number) => {
     if (!file) return;
     if (!fullAudioRef.current || fullAudioRef.current.file !== file) {
       fullAudioRef.current = { file, promise: decodeAudioFull(file) };
     }
-    let buffer;
+    let buffer: AudioBuffer;
     try {
       buffer = await fullAudioRef.current.promise;
     } catch {
@@ -321,12 +353,13 @@ export default function Main() {
     : null;
 
   return (
-    <>
-      <div className={`container${audioUrl ? ' has-player' : ''}`}>
-        {/* Шапка */}
-        <header className="header">
-          <h1>audio inference</h1>
-        </header>
+    <div className="app">
+      <div className="container">
+        {header && (
+          <header className="header">
+            <h1>audio inference</h1>
+          </header>
+        )}
 
         {/* Название текущей модели — компактно, слева под шапкой */}
         <div className="model-indicator" title={currentModel?.projectDescription || currentModelId}>
@@ -339,7 +372,6 @@ export default function Main() {
         <div className="main-area">
           <div
             className={`card upload-card${dragOver ? ' drag-over' : ''}`}
-            style={{ maxWidth: 700, textAlign: 'center' }}
           >
             {models.length > 1 && (
               <>
@@ -370,6 +402,12 @@ export default function Main() {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  triggerFileSelect();
+                }
+              }}
               role="button"
               tabIndex={0}
               aria-label="select audio file"
@@ -389,11 +427,20 @@ export default function Main() {
               ref={fileInputRef}
             />
 
-            <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
-              <button onClick={handleAnalyze} disabled={!file || !currentModelId || !currentModelReady || state === 'analyzing'}>
+            <div className="row upload-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleAnalyze}
+                disabled={!file || !currentModelId || !currentModelReady || state === 'analyzing'}
+              >
                 {state === 'analyzing' ? 'analyzing...' : 'analyze'}
               </button>
-              {file && <button onClick={handleReset}>reset</button>}
+              {file && (
+                <button type="button" onClick={handleReset}>
+                  reset
+                </button>
+              )}
             </div>
 
             {state === 'error' && <p className="error">{error}</p>}
@@ -431,12 +478,14 @@ export default function Main() {
         {selectedChunk && (
           <ChunkDetails
             chunk={selectedChunk}
-            siblings={selection.items}
+            siblings={selection?.items ?? []}
             chunkSeconds={chunkSeconds}
             duration={timeline}
             fileName={file?.name}
             modelName={modelId(analyzedModel)}
-            onSelect={(ch) => setSelection((prev) => ({ ...prev, key: chunkKey(ch) }))}
+            onSelect={(ch) =>
+              setSelection((prev) => (prev ? { ...prev, key: chunkKey(ch) } : prev))
+            }
             onClose={handleCloseDetails}
             onPlay={handlePlaySegment}
             onDownload={handleDownloadChunk}
@@ -445,20 +494,8 @@ export default function Main() {
 
         {rawLog.length > 0 && (
           <div className="card">
-            <strong>debug: raw server responses</strong>
-            <pre
-              style={{
-                whiteSpace: 'pre-wrap',
-                fontSize: 13,
-                color: '#888',
-                maxHeight: 300,
-                overflow: 'auto',
-                marginTop: 12,
-                background: 'rgba(255,255,255,0.03)',
-                padding: 16,
-                border: '1px solid rgba(255,255,255,0.05)',
-              }}
-            >
+            <strong className="card-title">debug: raw server responses</strong>
+            <pre className="debug-log">
               {rawLog.map((entry, i) => (
                 `[${i}] ${entry.url} → ${entry.status}\n` +
                 JSON.stringify(entry.body, null, 2) +
@@ -469,7 +506,7 @@ export default function Main() {
         )}
       </div>
 
-      {/* Плеер, закреплённый внизу страницы — появляется, когда выбран файл */}
+      {/* Плеер, прилипающий к низу экрана, — появляется, когда выбран файл */}
       {audioUrl && (
         <Player
           fileName={file?.name}
@@ -482,6 +519,6 @@ export default function Main() {
           onClose={handleReset}
         />
       )}
-    </>
+    </div>
   );
 }

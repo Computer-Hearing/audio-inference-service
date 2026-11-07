@@ -1,0 +1,34 @@
+# Фронтенд инференса: один Caddy, который раздаёт inference.js
+# (https://inference.kuronami.fun/inference.js) и проксирует API.
+#
+# Запуск из папки frontend/:
+#   docker compose up -d --build
+#
+# Сеть computer-hearing — общая для сервисов портала (её же использует
+# deployments/docker-compose.yaml). Внешний шлюз направляет
+# inference.kuronami.fun на этот контейнер по имени inference_frontend.
+services:
+  caddy:
+    container_name: inference_frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    expose:
+      - "80"
+    # Для проверки на своём компьютере: http://localhost:8080/inference.js
+    # ports:
+    #   - "8080:80"
+    environment:
+      # Куда проксировать API инференса
+      INFERENCE_API_UPSTREAM: ${INFERENCE_API_UPSTREAM:-inference_caddy:80}
+      # Какому сайту разрешено загружать inference.js и ходить в API
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-*}
+    networks:
+      computer-hearing:
+        aliases:
+          - inference_frontend
+
+networks:
+  computer-hearing:
+    external: true
