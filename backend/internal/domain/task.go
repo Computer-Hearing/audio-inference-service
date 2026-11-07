@@ -57,3 +57,9 @@ type AudioTaskPayload struct {
 	ModelName string
 	Chunks    audio.AudioChunks
 }
+
+// TaskDelivery - сообщение очереди: id задачи и чек для подтверждения обработки.
+type TaskDelivery struct {
+	TaskID  TaskID
+	Receipt string
+}
