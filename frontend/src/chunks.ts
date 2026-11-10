@@ -4,34 +4,6 @@
 // (Waveform.tsx), и карточке с подробностями о чанке (ChunkDetails.tsx).
 import type { Chunk } from './gen/inference/v1/inference_pb.ts';
 
-// Подписи классов по проекту — это префикс имени модели до первого "_":
-//   road_rnn_99k_09915acc_1           -> road
-//   traffic_mobilenet_1_0922combf1m_2 -> traffic
-// У road только target_output, у traffic — category_output и target_output.
-// Если проект не найден — показываем "class N", чтобы UI не ломался.
-export type LabelKind = 'category' | 'target';
-
-const PROJECT_LABELS: Record<string, Partial<Record<LabelKind, string[]>>> = {
-  road: {
-    target: ['dry_asphalt', 'snow', 'wet_asphalt'],
-  },
-  traffic: {
-    category: ['car', 'emv', 'motorcycle', 'tram', 'truck'],
-    target: ['acceleration', 'bell', 'braking', 'horn', 'idling', 'passing', 'siren'],
-  },
-};
-
-function projectOf(modelName: string | undefined): string | undefined {
-  return modelName?.split('_')[0];
-}
-
-export function labelsFor(modelName: string | undefined, kind: LabelKind, count: number): string[] {
-  const project = projectOf(modelName);
-  const labels = project ? PROJECT_LABELS[project]?.[kind] : undefined;
-  if (labels) return labels;
-  return Array.from({ length: count || 0 }, (_, i) => `class ${i}`);
-}
-
 export function argmaxIndex(arr: readonly number[] | undefined): number {
   if (!arr || !arr.length) return -1;
   let best = 0;
@@ -85,4 +57,36 @@ export function chunkKey(ch: Pick<Chunk, 'offset' | 'chunkIndex'>): string {
 
 export function layerLabel(offset: number): string {
   return offset ? `+${offset}s` : 'base';
+}
+
+// -----------------------------------------------------------------------
+// Имя скачиваемого фрагмента.
+// По умолчанию: <имя файла>_<слой>_chunk<номер>_<начало>-<конец>s,
+// например street_base_chunk03_6.0-8.0s (".wav" добавляется при сохранении).
+// -----------------------------------------------------------------------
+export function chunkFileStem(
+  sourceName: string | undefined,
+  chunk: Pick<Chunk, 'offset' | 'chunkIndex'>,
+  start: number,
+  end: number,
+): string {
+  const base = (sourceName || 'audio').replace(/\.[^.]+$/, '').replace(/[^\w\-]+/g, '_');
+  const layer = chunk.offset ? `offset${chunk.offset}s` : 'base';
+  const index = String(chunk.chunkIndex).padStart(2, '0');
+  return `${base}_${layer}_chunk${index}_${start.toFixed(1)}-${end.toFixed(1)}s`;
+}
+
+/**
+ * Имя файла, которое ввёл пользователь, — в безопасный вид: без символов,
+ * запрещённых в именах файлов Windows (\ / : * ? " < > |), без точек и
+ * пробелов по краям, с расширением .wav. Пустое имя — имя по умолчанию.
+ */
+export function toWavFileName(input: string, fallbackStem: string): string {
+  const stem = input
+    .replace(/\.wav$/i, '')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_')
+    .trim()
+    .replace(/^[.\s]+|[.\s]+$/g, '')
+    .slice(0, 120);
+  return `${stem || fallbackStem}.wav`;
 }

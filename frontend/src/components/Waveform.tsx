@@ -14,7 +14,8 @@
 // под диаграммой карточку с подробностями о нём (ChunkDetails.tsx).
 import { useEffect, useMemo, useRef } from 'react';
 import { computeBars, type AudioData } from '../audio.ts';
-import { labelsFor, argmaxIndex, chunkKey, chunkRange, type Range } from '../chunks.ts';
+import { argmaxIndex, chunkKey, chunkRange, type Range } from '../chunks.ts';
+import { labelsFor } from '../projects.ts';
 import type { Chunk } from '../gen/inference/v1/inference_pb.ts';
 
 type Rgb = [number, number, number];

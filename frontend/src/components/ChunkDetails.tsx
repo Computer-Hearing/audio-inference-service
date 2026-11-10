@@ -7,8 +7,10 @@
 // кнопки: прослушать фрагмент, скачать его в WAV и закрыть карточку.
 import { useEffect, useRef, useState } from 'react';
 import type { Chunk } from '../gen/inference/v1/inference_pb.ts';
+import { labelsFor } from '../projects.ts';
 import {
-  labelsFor,
+  chunkFileStem,
+  toWavFileName,
   argmaxIndex,
   chunkKey,
   chunkRange,
@@ -111,7 +113,7 @@ interface ChunkDetailsProps {
   onSelect: (chunk: Chunk) => void;
   onClose: () => void;
   onPlay: (start: number, end: number) => void;
-  onDownload: (chunk: Chunk, start: number, end: number) => Promise<void>;
+  onDownload: (start: number, end: number, fileName: string) => Promise<void>;
 }
 
 export default function ChunkDetails({
@@ -132,6 +134,9 @@ export default function ChunkDetails({
 
   const offset = chunk.offset || 0;
   const { start, end } = chunkRange(offset, chunk.chunkIndex, chunkSeconds, duration);
+  // Имя для скачивания: подставляется по умолчанию, пользователь может изменить
+  const defaultStem = chunkFileStem(fileName, chunk, start, end);
+  const [saveName, setSaveName] = useState(defaultStem);
   const hasError = !!chunk.errorMessage;
   // target_output есть у всех моделей, category_output — только у части.
   const hasCategory = chunk.category?.length > 0;
@@ -162,11 +167,16 @@ export default function ChunkDetails({
     setDownloadError(null);
   }, [chunk]);
 
+  // Другой чанк — снова имя по умолчанию
+  useEffect(() => {
+    setSaveName(defaultStem);
+  }, [defaultStem]);
+
   const handleDownload = async () => {
     setDownloading(true);
     setDownloadError(null);
     try {
-      await onDownload(chunk, start, end);
+      await onDownload(start, end, toWavFileName(saveName, defaultStem));
     } catch (e) {
       setDownloadError(e instanceof Error ? e.message : 'download failed');
     } finally {
@@ -214,6 +224,28 @@ export default function ChunkDetails({
       <div className="chunk-details-time muted">
         {formatSec(start)} – {formatSec(end)} · {formatSec(end - start)}
       </div>
+
+      <form
+        className="save-as"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!downloading && end > start) void handleDownload();
+        }}
+      >
+        <label className="muted" htmlFor="chunk-save-name">
+          save as
+        </label>
+        <input
+          id="chunk-save-name"
+          type="text"
+          value={saveName}
+          onChange={(e) => setSaveName(e.target.value)}
+          placeholder={defaultStem}
+          spellCheck={false}
+          autoComplete="off"
+        />
+        <span className="muted">.wav</span>
+      </form>
 
       {downloadError && <p className="error">Error: {downloadError}</p>}
 
