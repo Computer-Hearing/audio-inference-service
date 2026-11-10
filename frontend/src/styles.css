@@ -8,32 +8,35 @@
  * (portal/src/shared/styles/tokens.css): CSS-переменные наследуются через
  * границу Shadow DOM. Второе значение в var(...) — запасное, на случай
  * страницы без токенов (npm run dev); оно совпадает со значением портала.
+ * Скруглений нет: все блоки, кнопки и полосы прямоугольные.
  */
 
 :host {
-  --ai-bg: var(--bg, #000);
-  --ai-surface: var(--surface-1, #100f0d);
-  --ai-surface-2: var(--surface-2, #151311);
-  --ai-surface-hover: var(--surface-hover, #1a1815);
-  --ai-border: var(--border, #2a2622);
-  --ai-border-soft: var(--border-soft, #201d1a);
-  --ai-border-strong: var(--border-strong, #35302a);
-  --ai-border-hover: var(--border-hover, #554d44);
-  --ai-text: var(--text, #eeeae4);
-  --ai-text-2: var(--text-2, #d2ccc3);
-  --ai-text-3: var(--text-3, #bbb4a9);
-  --ai-muted: var(--text-muted, #a1998d);
-  --ai-faint: var(--text-faint, #463f37);
-  --ai-accent: var(--accent, #64cbbf);
-  --ai-accent-hover: var(--accent-hover, #8edfd5);
-  --ai-accent-soft: var(--accent-soft, rgba(100, 203, 191, 0.5));
-  --ai-accent-ring: var(--accent-ring, rgba(100, 203, 191, 0.2));
-  --ai-error: #f58d83; /* = --project-siren портала */
+  --ai-bg: var(--bg, #0d0d0c);
+  --ai-panel: var(--panel, rgba(13, 13, 12, 0.76));
+  --ai-surface: var(--surface-1, rgba(19, 19, 17, 0.86));
+  --ai-surface-2: var(--surface-2, rgba(26, 26, 23, 0.88));
+  --ai-surface-hover: var(--surface-hover, rgba(30, 30, 27, 0.9));
+  --ai-border: var(--border, #2b2a26);
+  --ai-border-soft: var(--border-soft, #201f1c);
+  --ai-border-strong: var(--border-strong, #3a3833);
+  --ai-border-hover: var(--border-hover, #5a5750);
+  --ai-text: var(--text, #edebe6);
+  --ai-text-2: var(--text-2, #d3d0c9);
+  --ai-text-3: var(--text-3, #b9b6ae);
+  --ai-muted: var(--text-muted, #8c8a84);
+  --ai-faint: var(--text-faint, #45433e);
+  --ai-accent: var(--accent, #7fc7bd);
+  --ai-accent-hover: var(--accent-hover, #a3dbd3);
+  --ai-accent-soft: var(--accent-soft, rgba(127, 199, 189, 0.5));
+  --ai-accent-ring: var(--accent-ring, rgba(127, 199, 189, 0.14));
+  --ai-error: var(--project-siren, #e58f86);
   --ai-font: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
-  --ai-radius: var(--radius-card, 14px);
-  --ai-radius-sm: var(--radius-control, 8px);
+  --ai-blur: var(--panel-blur, blur(14px));
 
   display: block;
+  /* Тёмные системные элементы (раскрывающийся список выбора модели) */
+  color-scheme: dark;
   color: var(--ai-text);
   font-family: var(--ai-font);
   font-size: 15px;
@@ -50,6 +53,10 @@
 
 .app {
   position: relative;
+}
+/* Место под плеер внизу окна, чтобы он не закрывал последнюю карточку */
+.app.has-player {
+  padding-bottom: 96px;
 }
 
 .container {
@@ -92,8 +99,9 @@ h1 {
 /* Карточки */
 .card {
   background: var(--ai-surface);
+  backdrop-filter: var(--ai-blur);
+  -webkit-backdrop-filter: var(--ai-blur);
   border: 1px solid var(--ai-border);
-  border-radius: var(--ai-radius);
   padding: 28px;
   margin-bottom: 24px;
   width: 100%;
@@ -147,6 +155,45 @@ input[type='file'] {
   display: none;
 }
 
+/* Поля ввода и выпадающий список — в стиле кнопок: линия снизу */
+input[type='text'],
+select {
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ai-text);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--ai-border-strong);
+  padding: 4px 2px;
+  transition: border-color 0.2s;
+}
+input[type='text']:hover,
+select:hover {
+  border-bottom-color: var(--ai-border-hover);
+}
+input[type='text']:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-bottom-color: var(--ai-accent);
+}
+input[type='text']::placeholder {
+  color: var(--ai-faint);
+}
+select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 22px;
+  /* Стрелка списка (цвет — --text-muted портала) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1998d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+}
+option {
+  background: var(--ai-surface-2);
+  color: var(--ai-text);
+}
+
 .muted {
   color: var(--ai-muted);
   font-size: 14px;
@@ -166,18 +213,6 @@ input[type='file'] {
 }
 
 /* ---------------------------------------------------------------------
-   Индикатор текущей модели — компактная строка слева.
-   --------------------------------------------------------------------- */
-.model-indicator {
-  font-size: 13px;
-  color: var(--ai-muted);
-  letter-spacing: 0.5px;
-}
-.model-indicator-value {
-  color: var(--ai-text);
-}
-
-/* ---------------------------------------------------------------------
    Карточка загрузки файла со стрелками переключения модели на середине
    левой/правой границы.
    --------------------------------------------------------------------- */
@@ -192,6 +227,38 @@ input[type='file'] {
   background: var(--ai-surface-hover);
 }
 
+/* Подпроект (переключается стрелками) и выбор модели внутри него */
+.project-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+}
+.project-title {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ai-accent);
+}
+.project-count {
+  font-size: 11px;
+  color: var(--ai-muted);
+  font-variant-numeric: tabular-nums;
+}
+.model-select-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 18px;
+  font-size: 13px;
+}
+.model-select {
+  max-width: 100%;
+}
+
 .upload-drop {
   display: flex;
   flex-direction: column;
@@ -199,7 +266,6 @@ input[type='file'] {
   gap: 14px;
   cursor: pointer;
   padding: 8px 40px;
-  border-radius: var(--ai-radius-sm);
 }
 .upload-drop:hover .upload-icon {
   color: var(--ai-accent);
@@ -234,7 +300,6 @@ input[type='file'] {
   transform: translateY(-50%);
   width: 34px;
   height: 34px;
-  border-radius: 50%;
   border: 1px solid var(--ai-border-strong);
   background: var(--ai-surface-2);
   display: flex;
@@ -320,7 +385,6 @@ input[type='file'] {
   bottom: 0;
   background: var(--ai-surface-2);
   border: 1px solid var(--ai-border-soft);
-  border-radius: 4px;
   padding: 4px 6px;
   font-size: 10px;
   line-height: 1.5;
@@ -405,6 +469,20 @@ input[type='file'] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Имя файла для скачивания фрагмента */
+.save-as {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  max-width: 560px;
+}
+.save-as input {
+  flex: 1;
+  font-size: 13px;
+}
+
 .chunk-details-siblings {
   display: flex;
   flex-wrap: wrap;
@@ -485,7 +563,6 @@ input[type='file'] {
   position: relative;
   height: 4px;
   background: var(--ai-border-soft);
-  border-radius: 2px;
   overflow: hidden;
 }
 .chunk-dist-bar-fill {
@@ -494,7 +571,6 @@ input[type='file'] {
   left: 0;
   bottom: 0;
   background: var(--ai-border-hover);
-  border-radius: 2px;
 }
 .chunk-dist-row.top .chunk-dist-bar-fill {
   background: var(--ai-accent);
@@ -538,23 +614,24 @@ input[type='file'] {
   background: var(--ai-bg);
   padding: 16px;
   border: 1px solid var(--ai-border-soft);
-  border-radius: var(--ai-radius-sm);
 }
 
 /* ---------------------------------------------------------------------
-   Плеер. position: sticky — прилипает к низу экрана, пока виден блок
-   инференса, и не перекрывает подвал портала (fixed перекрывал бы).
+   Плеер, закреплённый внизу окна (как в музыкальных сервисах), на всю
+   ширину. Содержимое выровнено по ширине страницы портала (--container,
+   --gutter). Внизу у .app.has-player оставлено место, чтобы плеер не
+   закрывал последнюю карточку.
    --------------------------------------------------------------------- */
 .player-bar {
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
   z-index: 40;
-  margin-top: 8px;
-  background: rgba(16, 15, 13, 0.97);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--ai-border);
-  border-radius: var(--ai-radius);
+  background: var(--ai-panel);
+  backdrop-filter: var(--ai-blur);
+  -webkit-backdrop-filter: var(--ai-blur);
+  border-top: 1px solid var(--ai-border);
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
   animation: playerSlideUp 0.3s ease;
 }
@@ -565,7 +642,9 @@ input[type='file'] {
 }
 
 .player-bar-inner {
-  padding: 12px 20px;
+  max-width: var(--container, 1424px);
+  margin: 0 auto;
+  padding: 12px var(--gutter, 32px);
   display: flex;
   align-items: center;
   gap: 18px;
@@ -575,7 +654,6 @@ input[type='file'] {
   flex-shrink: 0;
   width: 42px;
   height: 42px;
-  border-radius: 50%;
   border: 1px solid var(--ai-accent-soft);
   background: var(--ai-accent-ring);
   display: flex;
@@ -636,7 +714,6 @@ input[type='file'] {
   flex: 1;
   height: 4px;
   background: var(--ai-border);
-  border-radius: 2px;
   cursor: pointer;
 }
 .player-progress-fill {
@@ -645,17 +722,15 @@ input[type='file'] {
   left: 0;
   bottom: 0;
   background: var(--ai-accent);
-  border-radius: 2px;
 }
+/* Ползунок — вертикальная черта на границе проигранной части */
 .player-progress-thumb {
   position: absolute;
   top: 50%;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
+  width: 3px;
+  height: 14px;
   background: var(--ai-accent);
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 4px var(--ai-accent-ring);
 }
 
 .player-close-btn {
@@ -730,6 +805,12 @@ input[type='file'] {
     gap: 8px;
   }
 
+  .app.has-player {
+    padding-bottom: 124px;
+  }
+  .save-as {
+    flex-wrap: wrap;
+  }
   .player-bar-inner {
     padding: 10px 14px;
     gap: 10px;

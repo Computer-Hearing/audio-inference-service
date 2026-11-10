@@ -7,6 +7,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -14,7 +15,6 @@ import {
 } from 'react';
 import {
   modelId,
-  modelLabel,
   modelChunkSeconds,
   MAX_AUDIO_BYTES,
   type InferenceApi,
@@ -28,6 +28,7 @@ import {
   type AudioData,
 } from './audio.ts';
 import { chunkKey } from './chunks.ts';
+import { groupByProject, modelShortName } from './projects.ts';
 import type { Chunk, Model } from './gen/inference/v1/inference_pb.ts';
 import Waveform from './components/Waveform.tsx';
 import ChunkDetails from './components/ChunkDetails.tsx';
@@ -57,15 +58,6 @@ function truncateName(name: string, max = 40): string {
 
 // Простая, незамысловатая иконка — звуковая дорожка (эквалайзер),
 // тематически про аудио, без лишней "сферической" декорации.
-// Имя скачиваемого фрагмента: <имя файла>_<слой>_chunk<номер>_<начало>-<конец>s.wav,
-// например street_base_chunk03_6.0-8.0s.wav
-function chunkFileName(sourceName: string, chunk: Chunk, start: number, end: number): string {
-  const base = (sourceName || 'audio').replace(/\.[^.]+$/, '').replace(/[^\w\-]+/g, '_');
-  const layer = chunk.offset ? `offset${chunk.offset}s` : 'base';
-  const index = String(chunk.chunkIndex).padStart(2, '0');
-  return `${base}_${layer}_chunk${index}_${start.toFixed(1)}-${end.toFixed(1)}s.wav`;
-}
-
 function UploadIcon() {
   return (
     <svg
@@ -106,7 +98,11 @@ function ArrowIcon({ direction }: { direction: 'left' | 'right' }) {
 
 export default function App({ api, header = true }: AppProps) {
   const [models, setModels] = useState<Model[]>([]);
-  const [modelIndex, setModelIndex] = useState(0);
+  // Стрелки переключают подпроект (traffic, road, ...), а модель внутри
+  // подпроекта выбирается списком. Для каждого подпроекта запоминаем
+  // выбранную модель: { traffic: 'traffic_mobilenet_..._2', ... }
+  const [projectIndex, setProjectIndex] = useState(0);
+  const [chosenModels, setChosenModels] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -154,7 +150,7 @@ export default function App({ api, header = true }: AppProps) {
     api.getModels().then((list) => {
       if (cancelled) return;
       setModels(list);
-      setModelIndex(0);
+      setProjectIndex(0);
     });
     return () => {
       cancelled = true;
@@ -186,14 +182,28 @@ export default function App({ api, header = true }: AppProps) {
     };
   }, [playing]);
 
-  const currentModel = models[modelIndex] || null;
+  const projects = useMemo(() => groupByProject(models), [models]);
+  const project = projects[projectIndex] ?? null;
+  // Выбранная в подпроекте модель, по умолчанию — первая готовая
+  const currentModel = project
+    ? (project.models.find((m) => m.name === chosenModels[project.id]) ??
+      project.models.find((m) => m.ready !== false) ??
+      project.models[0])
+    : null;
   const currentModelId = modelId(currentModel);
-  const currentModelLabel = modelLabel(currentModel) || 'no models available';
   const currentModelReady = !currentModel || currentModel.ready !== false;
+  const playerLabel = project && currentModel
+    ? `${project.title} · ${modelShortName(currentModel.name)}`
+    : 'no models available';
 
-  const goToModel = (delta: number) => {
-    if (!models.length) return;
-    setModelIndex((i) => (i + delta + models.length) % models.length);
+  const goToProject = (delta: number) => {
+    if (!projects.length) return;
+    setProjectIndex((i) => (i + delta + projects.length) % projects.length);
+  };
+
+  const selectModel = (name: string) => {
+    if (!project) return;
+    setChosenModels((prev) => ({ ...prev, [project.id]: name }));
   };
 
   const processFile = (f: File | null | undefined) => {
@@ -328,7 +338,7 @@ export default function App({ api, header = true }: AppProps) {
 
   // Скачать фрагмент: файл декодируется в полном качестве (один раз на
   // файл), нужный отрезок вырезается и сохраняется в WAV.
-  const handleDownloadChunk = async (chunk: Chunk, start: number, end: number) => {
+  const handleDownloadChunk = async (start: number, end: number, fileName: string) => {
     if (!file) return;
     if (!fullAudioRef.current || fullAudioRef.current.file !== file) {
       fullAudioRef.current = { file, promise: decodeAudioFull(file) };
@@ -341,7 +351,7 @@ export default function App({ api, header = true }: AppProps) {
       throw new Error('this audio format cannot be decoded by the browser');
     }
     const blob = encodeWavSegment(buffer, start, end);
-    saveBlob(blob, chunkFileName(file.name, chunk, start, end));
+    saveBlob(blob, fileName);
   };
 
   const chunkSeconds = modelChunkSeconds(analyzedModel);
@@ -353,7 +363,7 @@ export default function App({ api, header = true }: AppProps) {
     : null;
 
   return (
-    <div className="app">
+    <div className={`app${audioUrl ? ' has-player' : ''}`}>
       <div className="container">
         {header && (
           <header className="header">
@@ -361,39 +371,63 @@ export default function App({ api, header = true }: AppProps) {
           </header>
         )}
 
-        {/* Название текущей модели — компактно, слева под шапкой */}
-        <div className="model-indicator" title={currentModel?.projectDescription || currentModelId}>
-          model: <span className="model-indicator-value">{currentModelLabel}</span>
-          {currentModel && <> · {modelChunkSeconds(currentModel)}s chunks</>}
-          {!currentModelReady && <> · not ready</>}
-        </div>
-
         {/* Основная область – центрирование блока загрузки */}
         <div className="main-area">
           <div
             className={`card upload-card${dragOver ? ' drag-over' : ''}`}
           >
-            {models.length > 1 && (
+            {projects.length > 1 && (
               <>
                 <button
                   type="button"
                   className="model-arrow model-arrow-left"
-                  onClick={() => goToModel(-1)}
-                  aria-label="previous model"
-                  title="previous model"
+                  onClick={() => goToProject(-1)}
+                  aria-label="previous project"
+                  title="previous project"
                 >
                   <ArrowIcon direction="left" />
                 </button>
                 <button
                   type="button"
                   className="model-arrow model-arrow-right"
-                  onClick={() => goToModel(1)}
-                  aria-label="next model"
-                  title="next model"
+                  onClick={() => goToProject(1)}
+                  aria-label="next project"
+                  title="next project"
                 >
                   <ArrowIcon direction="right" />
                 </button>
               </>
+            )}
+
+            {/* Подпроект (переключается стрелками) и модель внутри него */}
+            <div className="project-head">
+              <span className="project-title">{project ? project.title : 'no models available'}</span>
+              {projects.length > 1 && (
+                <span className="project-count">
+                  {projectIndex + 1} / {projects.length}
+                </span>
+              )}
+            </div>
+            {project && currentModel && (
+              <div className="model-select-row">
+                <label className="muted" htmlFor="model-select">
+                  model
+                </label>
+                <select
+                  id="model-select"
+                  className="model-select"
+                  value={currentModel.name}
+                  onChange={(e) => selectModel(e.target.value)}
+                  title={currentModel.name}
+                >
+                  {project.models.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {modelShortName(m.name)} · {modelChunkSeconds(m)}s
+                      {m.ready === false ? ' · not ready' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
             <div
@@ -506,11 +540,11 @@ export default function App({ api, header = true }: AppProps) {
         )}
       </div>
 
-      {/* Плеер, прилипающий к низу экрана, — появляется, когда выбран файл */}
+      {/* Плеер внизу экрана — появляется, когда выбран файл */}
       {audioUrl && (
         <Player
           fileName={file?.name}
-          modelLabel={currentModelLabel}
+          modelLabel={playerLabel}
           playing={playing}
           currentTime={currentTime}
           duration={duration}

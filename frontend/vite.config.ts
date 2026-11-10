@@ -48,7 +48,7 @@ export default defineConfig(({ command }) => ({
     rolldownOptions: {
       output: {
         // Всё в один файл, без дополнительных чанков
-        inlineDynamicImports: true,
+        codeSplitting: false,
         minify: true,
       },
     },
