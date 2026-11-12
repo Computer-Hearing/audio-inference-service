@@ -32,7 +32,6 @@
   --ai-accent-ring: var(--accent-ring, rgba(127, 199, 189, 0.14));
   --ai-error: var(--project-siren, #e58f86);
   --ai-font: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
-  --ai-blur: var(--panel-blur, blur(14px));
 
   display: block;
   /* Тёмные системные элементы (раскрывающийся список выбора модели) */
@@ -99,8 +98,6 @@ h1 {
 /* Карточки */
 .card {
   background: var(--ai-surface);
-  backdrop-filter: var(--ai-blur);
-  -webkit-backdrop-filter: var(--ai-blur);
   border: 1px solid var(--ai-border);
   padding: 28px;
   margin-bottom: 24px;
@@ -629,8 +626,6 @@ option {
   bottom: 0;
   z-index: 40;
   background: var(--ai-panel);
-  backdrop-filter: var(--ai-blur);
-  -webkit-backdrop-filter: var(--ai-blur);
   border-top: 1px solid var(--ai-border);
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
   animation: playerSlideUp 0.3s ease;
